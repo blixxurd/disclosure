@@ -13,7 +13,8 @@
     "./config": "./src/config.ts"
   },
   "scripts": {
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
   },
   "dependencies": {
     "better-sqlite3": "^11.7.0"

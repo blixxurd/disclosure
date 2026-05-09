@@ -9,11 +9,15 @@
     "index": "pnpm --filter @disclosure/indexer run dev --ocr",
     "index:fast": "pnpm --filter @disclosure/indexer run dev",
     "classify": "pnpm --filter @disclosure/classifier run dev",
-    "typecheck": "pnpm -r run typecheck"
+    "typecheck": "pnpm -r run typecheck",
+    "test": "pnpm -r run test"
   },
   "engines": {
     "node": ">=20.19",
     "pnpm": ">=9"
   },
-  "packageManager": "pnpm@9.15.9"
+  "packageManager": "pnpm@9.15.9",
+  "devDependencies": {
+    "vitest": "^4.1.5"
+  }
 }

@@ -12,6 +12,7 @@
     "start": "node dist/index.js",
     "build": "tsc",
     "typecheck": "tsc --noEmit",
+    "test": "vitest run",
     "install:browser": "playwright install chromium"
   },
   "dependencies": {
