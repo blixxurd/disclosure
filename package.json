@@ -2,8 +2,9 @@
   "name": "disclosure",
   "version": "0.1.0",
   "private": true,
-  "description": "UFO/UAP disclosure archive monorepo",
+  "description": "UFO/UAP disclosure archive — downloader, indexer, classifier (and webapp)",
   "scripts": {
+    "refresh": "pnpm download && pnpm index && pnpm classify",
     "download": "pnpm --filter @disclosure/downloader run dev",
     "index": "pnpm --filter @disclosure/indexer run dev --ocr",
     "index:fast": "pnpm --filter @disclosure/indexer run dev",
