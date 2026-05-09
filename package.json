@@ -4,6 +4,7 @@
   "private": true,
   "description": "UFO/UAP disclosure archive monorepo",
   "scripts": {
+    "download": "pnpm --filter @disclosure/downloader run dev",
     "typecheck": "pnpm -r run typecheck"
   },
   "engines": {

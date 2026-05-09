@@ -1,0 +1,30 @@
+{
+  "name": "@disclosure/downloader",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "dist/index.js",
+  "bin": {
+    "disclosure-download": "dist/index.js"
+  },
+  "scripts": {
+    "dev": "tsx src/index.ts",
+    "start": "node dist/index.js",
+    "build": "tsc && cp -r src/db/migrations dist/db/migrations",
+    "typecheck": "tsc --noEmit",
+    "install:browser": "playwright install chromium"
+  },
+  "dependencies": {
+    "better-sqlite3": "^11.7.0",
+    "papaparse": "^5.4.1",
+    "p-limit": "^6.2.0",
+    "playwright": "^1.59.1"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.12",
+    "@types/node": "^22.10.5",
+    "@types/papaparse": "^5.3.15",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.3"
+  }
+}
