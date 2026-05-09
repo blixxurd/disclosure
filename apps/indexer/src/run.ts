@@ -1,19 +1,13 @@
 import { resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
-import { dirname } from 'node:path';
 import pLimit from 'p-limit';
-
-// Db lives in the downloader for now; we import it via relative path. When
-// the webapp lands we'll lift this into packages/shared.
-import { Db, type FileRow, type FileMetadataInput } from '../../downloader/src/db/index.js';
-
+import { Db, type FileRow, type FileMetadataInput } from '@disclosure/shared/db';
+import { DATA_ROOT } from '@disclosure/shared/config';
+import { createLogger } from '@disclosure/shared/log';
 import { pdfInfo, decryptPdfInPlace, extractPdfText, looksLikeScan } from './pdf.js';
-import { ocrPdf, ocrImage } from './ocr.js';
+import { ocrPdf } from './ocr.js';
 import { readExif, shutdownExif, pickSharedFields } from './exif.js';
-import { log } from './log.js';
 
-const here = dirname(fileURLToPath(import.meta.url));
-const DATA_ROOT = resolve(here, '../../../data');
+const log = createLogger('-indexer');
 const EXTRACTOR_VERSION = 'indexer/0.1.0';
 
 export interface RunOptions {

@@ -1,8 +1,10 @@
 import Papa from 'papaparse';
-import { sha256, urlSlug } from './util.js';
-import { log } from './log.js';
 import type { APIRequestContext } from 'playwright';
-import type { ReleaseConfig } from './config.js';
+import { sha256, urlSlug } from '@disclosure/shared/util';
+import { createLogger } from '@disclosure/shared/log';
+import type { ReleaseConfig } from '@disclosure/shared/db';
+
+const log = createLogger('');
 
 // What the war.gov CSV gives us, before we normalize.
 interface RawRow {

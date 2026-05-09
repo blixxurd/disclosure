@@ -1,5 +1,12 @@
 import { createHash } from 'node:crypto';
-import { mkdirSync, renameSync, writeFileSync, existsSync, statSync, readFileSync } from 'node:fs';
+import {
+  mkdirSync,
+  renameSync,
+  writeFileSync,
+  existsSync,
+  statSync,
+  readFileSync,
+} from 'node:fs';
 import { dirname } from 'node:path';
 
 export function sha256(buf: Buffer | string): string {
@@ -21,23 +28,22 @@ export function atomicWrite(path: string, data: Buffer): void {
 
 export function fileExistsWithSha256(path: string, expectedSha: string): boolean {
   if (!existsSync(path)) return false;
-  const actual = sha256(readFileSync(path));
-  return actual === expectedSha;
+  return sha256(readFileSync(path)) === expectedSha;
 }
 
-export function fileSize(path: string): number | null {
-  try {
-    return statSync(path).size;
-  } catch {
-    return null;
-  }
+export function sha256OfFile(path: string): string {
+  return sha256(readFileSync(path));
+}
+
+export function sizeOfFile(path: string): number {
+  return statSync(path).size;
 }
 
 export function nowIso(): string {
   return new Date().toISOString();
 }
 
-// Filename slug from a URL. e.g.
+// Filename slug from a URL, e.g.
 //   https://www.war.gov/medialink/ufo/release_1/foo-bar.pdf  →  'foo-bar'
 // Used for natural_key derivation.
 export function urlSlug(url: string): string | null {
@@ -51,7 +57,7 @@ export function urlSlug(url: string): string | null {
   }
 }
 
-// Filename including extension, lowercased — for on-disk path.
+// Filename including extension, lowercased — for on-disk paths.
 export function urlFilename(url: string): string | null {
   try {
     const u = new URL(url);

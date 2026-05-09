@@ -75,7 +75,7 @@ Three layers:
 ### Migrations
 
 Schema versioning lives in a `_migration` table. Migrations are SQL files in
-`apps/downloader/src/db/migrations/NNN_*.sql`, applied in order on startup.
+`packages/shared/src/db/migrations/NNN_*.sql`, applied in order on startup.
 
 ```sql
 CREATE TABLE _migration (

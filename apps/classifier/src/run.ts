@@ -1,6 +1,8 @@
-import { Db } from '../../downloader/src/db/index.js';
+import { Db } from '@disclosure/shared/db';
+import { createLogger } from '@disclosure/shared/log';
 import { TEXT_RULES, METADATA_RULES, type Tier, type Theme } from './keywords.js';
-import { log } from './log.js';
+
+const log = createLogger('-classifier');
 
 const TIER_RANK: Record<Tier, number> = { T1: 5, T2: 4, T3: 3, T4: 2, T5: 1 };
 

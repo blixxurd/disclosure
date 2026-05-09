@@ -6,11 +6,13 @@
 // We do this per-page so we can report progress + handle large docs
 // without spiking memory.
 
-import { mkdtempSync, readdirSync, rmSync, statSync } from 'node:fs';
+import { mkdtempSync, readdirSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { resolve as pathResolve } from 'node:path';
+import { createLogger } from '@disclosure/shared/log';
 import { runCmd } from './util.js';
-import { log } from './log.js';
+
+const log = createLogger('-indexer');
 
 export interface OcrResult {
   text: string;

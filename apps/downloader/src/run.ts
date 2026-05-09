@@ -1,19 +1,16 @@
 import { writeFileSync } from 'node:fs';
 import { resolve, relative } from 'node:path';
 import pLimit from 'p-limit';
-import { Db, type RunCounts } from './db/index.js';
+import { Db, type RunCounts, type ReleaseConfig } from '@disclosure/shared/db';
+import { DATA_ROOT, MANIFESTS_DIR } from '@disclosure/shared/config';
+import { ensureDir, nowIso } from '@disclosure/shared/util';
+import { createLogger } from '@disclosure/shared/log';
 import { openBrowser } from './browser.js';
 import { fetchManifest, parseManifest } from './manifest.js';
 import { downloadFile } from './download.js';
-import {
-  DATA_ROOT,
-  DOWNLOAD_CONCURRENCY,
-  MANIFESTS_DIR,
-  RELEASES,
-  type ReleaseConfig,
-} from './config.js';
-import { ensureDir, nowIso } from './util.js';
-import { log } from './log.js';
+import { DOWNLOAD_CONCURRENCY, RELEASES } from './config.js';
+
+const log = createLogger('');
 
 export interface RunOptions {
   /** Skip downloads — only sync the manifest into the DB. */

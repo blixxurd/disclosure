@@ -1,6 +1,8 @@
 import { chromium, type Browser, type BrowserContext, type APIRequestContext } from 'playwright';
+import { createLogger } from '@disclosure/shared/log';
 import { NAV_TIMEOUT_MS } from './config.js';
-import { log } from './log.js';
+
+const log = createLogger('');
 
 export interface BrowserSession {
   ctx: BrowserContext;

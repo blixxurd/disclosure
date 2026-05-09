@@ -1,14 +1,7 @@
+// Indexer-specific subprocess helper. The shared package has the file/hash
+// utilities; this module is just the spawn() wrapper that feeds qpdf,
+// pdftotext, pdftoppm, tesseract.
 import { spawn } from 'node:child_process';
-import { createHash } from 'node:crypto';
-import { readFileSync, statSync } from 'node:fs';
-
-export function sha256OfFile(path: string): string {
-  return createHash('sha256').update(readFileSync(path)).digest('hex');
-}
-
-export function sizeOfFile(path: string): number {
-  return statSync(path).size;
-}
 
 export interface RunResult {
   code: number;

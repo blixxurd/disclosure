@@ -1,5 +1,7 @@
 import type { APIRequestContext } from 'playwright';
-import { log } from './log.js';
+import { createLogger } from '@disclosure/shared/log';
+
+const log = createLogger('');
 
 // dvidshub.net public video pages embed the playback mp4 in a <source> tag.
 // The URL points at CloudFront (no auth) and matches a stable per-asset path.

@@ -1,10 +1,10 @@
 import type { APIRequestContext } from 'playwright';
 import { resolve, relative } from 'node:path';
-import { atomicWrite, ensureDir, fileExistsWithSha256, sha256, urlFilename } from './util.js';
-import { DATA_ROOT, FILES_DIR, DOWNLOAD_TIMEOUT_MS, type ReleaseConfig } from './config.js';
-import type { Db, FileRow } from './db/index.js';
+import { atomicWrite, ensureDir, fileExistsWithSha256, sha256, urlFilename } from '@disclosure/shared/util';
+import { DATA_ROOT, FILES_DIR } from '@disclosure/shared/config';
+import type { Db, FileRow, ReleaseConfig } from '@disclosure/shared/db';
+import { DOWNLOAD_TIMEOUT_MS } from './config.js';
 import { resolveDvidsVideo } from './dvids.js';
-import { log } from './log.js';
 
 export type DownloadOutcome =
   | { kind: 'verified'; bytes: 0 }              // already on disk with matching sha

@@ -2,12 +2,21 @@ import Database from 'better-sqlite3';
 import { readdirSync, readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { DB_PATH, type ReleaseConfig } from '../config.js';
+import { DB_PATH } from '../config.js';
 import { ensureDir, nowIso } from '../util.js';
-import { log } from '../log.js';
+import { createLogger, type Logger } from '../log.js';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const MIGRATIONS_DIR = resolve(here, 'migrations');
+
+// Release config is the shape of a per-release entry the downloader maintains
+// in apps/downloader/src/config.ts. Defined here because Db.upsertRelease takes it.
+export interface ReleaseConfig {
+  slug: string;
+  name: string;
+  sourceUrl: string;
+  manifestUrl: string;
+}
 
 export interface ReleaseRow {
   id: number;
@@ -132,12 +141,22 @@ export interface RunCounts {
   files_failed: number;
 }
 
+export interface DbOptions {
+  /** Override the SQLite file path (defaults to DATA_ROOT/disclosure.db). */
+  path?: string;
+  /** Logger for migration messages. Defaults to a no-suffix logger. */
+  log?: Logger;
+}
+
 export class Db {
   private readonly db: Database.Database;
+  private readonly log: Logger;
 
-  constructor() {
-    ensureDir(dirname(DB_PATH));
-    this.db = new Database(DB_PATH);
+  constructor(opts: DbOptions = {}) {
+    this.log = opts.log ?? createLogger('');
+    const path = opts.path ?? DB_PATH;
+    ensureDir(dirname(path));
+    this.db = new Database(path);
     this.db.pragma('journal_mode = WAL');
     this.db.pragma('foreign_keys = ON');
     this.runMigrations();
@@ -165,7 +184,7 @@ export class Db {
       const version = parseInt(m[1]!, 10);
       if (applied.has(version)) continue;
       const sql = readFileSync(resolve(MIGRATIONS_DIR, f), 'utf8');
-      log.info('applying migration', { version, file: f });
+      this.log.info('applying migration', { version, file: f });
       const tx = this.db.transaction(() => {
         this.db.exec(sql);
         this.db
@@ -239,7 +258,9 @@ export class Db {
   upsertRecord(input: RecordUpsertInput): { id: number; action: 'inserted' | 'updated' | 'unchanged' } {
     const now = nowIso();
     const existing = this.db
-      .prepare<[string], RecordRow>('SELECT id, release_id, natural_key, content_sha256, removed_at FROM record WHERE natural_key = ?')
+      .prepare<[string], RecordRow>(
+        'SELECT id, release_id, natural_key, content_sha256, removed_at FROM record WHERE natural_key = ?',
+      )
       .get(input.natural_key);
 
     if (existing) {
@@ -317,13 +338,10 @@ export class Db {
   tombstoneRecordsNotIn(releaseId: number, keepKeys: string[]): number {
     if (keepKeys.length === 0) {
       const result = this.db
-        .prepare(
-          'UPDATE record SET removed_at = ? WHERE release_id = ? AND removed_at IS NULL',
-        )
+        .prepare('UPDATE record SET removed_at = ? WHERE release_id = ? AND removed_at IS NULL')
         .run(nowIso(), releaseId);
       return result.changes;
     }
-    // Build a parameterized NOT IN list.
     const placeholders = keepKeys.map(() => '?').join(',');
     const result = this.db
       .prepare(
@@ -341,7 +359,6 @@ export class Db {
       .prepare<[string], FileRow>('SELECT * FROM file WHERE source_url = ?')
       .get(input.source_url);
     if (existing) {
-      // Files are immutable apart from fetch state; we don't update kind/record here.
       return { id: existing.id, action: 'unchanged' };
     }
     const result = this.db
@@ -360,9 +377,7 @@ export class Db {
   }
 
   listFilesNeedingDownload(): FileRow[] {
-    return this.db
-      .prepare<[], FileRow>(`SELECT * FROM file ORDER BY id ASC`)
-      .all();
+    return this.db.prepare<[], FileRow>(`SELECT * FROM file ORDER BY id ASC`).all();
   }
 
   setFileResolvedUrl(id: number, resolvedUrl: string): void {
@@ -392,12 +407,9 @@ export class Db {
       .run(args.pre_decrypt_sha256, args.new_sha256, args.new_size_bytes, nowIso(), args.id);
   }
 
-  // Lists files that have been downloaded (have local_path) for the indexer.
   listDownloadedFiles(): FileRow[] {
     return this.db
-      .prepare<[], FileRow>(
-        `SELECT * FROM file WHERE local_path IS NOT NULL ORDER BY id ASC`,
-      )
+      .prepare<[], FileRow>(`SELECT * FROM file WHERE local_path IS NOT NULL ORDER BY id ASC`)
       .all();
   }
 
@@ -481,7 +493,7 @@ export class Db {
       );
   }
 
-  // ── user_record_meta (open-ended JSON bag for analyst annotations) ───
+  // ── user_record_meta — open-ended JSON bag for analyst annotations ───
   // The classifier writes here; user-set rows are protected via the
   // `user_overridden` field inside the JSON value (caller checks before writing).
   getUserRecordMeta(recordId: number, key: string): { value: string } | null {
@@ -506,7 +518,6 @@ export class Db {
       .run(recordId, key, valueJson, nowIso());
   }
 
-  // Iterate all records — used by the classifier to produce per-record analyses.
   listAllRecords(): { id: number; release_id: number; natural_key: string; title: string | null }[] {
     return this.db
       .prepare<[], { id: number; release_id: number; natural_key: string; title: string | null }>(

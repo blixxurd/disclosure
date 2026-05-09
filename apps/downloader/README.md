@@ -75,22 +75,17 @@ URL pattern lives in `src/manifest.ts`.
 
 ```
 src/
-├── index.ts          # CLI entry — argument parsing
-├── run.ts            # orchestrator: per-release loop + concurrency
-├── browser.ts        # Playwright session manager (real Chrome)
-├── manifest.ts       # CSV fetch + papaparse + record/file derivation
-├── download.ts       # streaming download w/ conditional GET + atomic write
-├── dvids.ts          # DVIDS video page scraper → CloudFront mp4 URL
-├── config.ts         # paths, RELEASES array, concurrency settings
-├── log.ts            # human + JSON dual-stream logger
-├── util.ts           # sha256, atomic write, URL → filename
-└── db/
-    ├── index.ts      # Db class — opens SQLite, runs migrations, exposes typed methods
-    └── migrations/
-        ├── 001_init.sql
-        ├── 002_file_resolved_url.sql
-        └── 003_indexer_tables.sql   ← used by the indexer; declared here so all schema lives in one place
+├── index.ts        # CLI entry — argument parsing
+├── run.ts          # orchestrator: per-release loop + concurrency
+├── browser.ts      # Playwright session manager (real Chrome)
+├── manifest.ts     # CSV fetch + papaparse + record/file derivation
+├── download.ts     # streaming download w/ conditional GET + atomic write
+├── dvids.ts        # DVIDS video page scraper → CloudFront mp4 URL
+└── config.ts       # downloader-specific config (RELEASES, concurrency, timeouts)
 ```
+
+Shared infrastructure — `Db` class, migrations, logger, util helpers, path
+constants — lives in `@disclosure/shared` (see `packages/shared/`).
 
 ## Idempotency
 

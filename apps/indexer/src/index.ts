@@ -1,6 +1,8 @@
 #!/usr/bin/env node
+import { createLogger } from '@disclosure/shared/log';
 import { runOnce, type RunOptions } from './run.js';
-import { log } from './log.js';
+
+const log = createLogger('-indexer');
 
 function parseArgs(argv: string[]): RunOptions {
   const opts: RunOptions = {};

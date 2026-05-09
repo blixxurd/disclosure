@@ -5,9 +5,11 @@
 // care about and stash the raw output too.
 
 import { renameSync, unlinkSync } from 'node:fs';
-import { dirname, resolve as pathResolve } from 'node:path';
-import { runCmd, sha256OfFile, sizeOfFile } from './util.js';
-import { log } from './log.js';
+import { sha256OfFile, sizeOfFile } from '@disclosure/shared/util';
+import { createLogger } from '@disclosure/shared/log';
+import { runCmd } from './util.js';
+
+const log = createLogger('-indexer');
 
 export interface PdfInfo {
   pages: number | null;

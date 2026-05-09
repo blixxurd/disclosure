@@ -95,8 +95,8 @@ src/
 └── util.ts         # spawn() helper, sha256
 ```
 
-The `Db` class lives in `apps/downloader/src/db/index.ts` (relative import
-for now; will move to `packages/shared` when the webapp lands).
+The `Db` class and migrations live in `packages/shared/` — imported as
+`@disclosure/shared/db`.
 
 ## Output
 
@@ -121,8 +121,8 @@ for now; will move to `packages/shared` when the webapp lands).
 
 No DB migration needed unless you're capturing a field that doesn't fit any
 existing column on `file_metadata` — in that case add migration `004_*.sql`
-to `apps/downloader/src/db/migrations/` and update the `FileMetadataInput`
-interface in `apps/downloader/src/db/index.ts`.
+to `packages/shared/src/db/migrations/` and update the `FileMetadataInput`
+interface in `packages/shared/src/db/index.ts`.
 
 ## Troubleshooting
 
