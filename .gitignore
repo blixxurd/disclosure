@@ -1,0 +1,25 @@
+# Build artifacts
+node_modules/
+dist/
+*.tsbuildinfo
+coverage/
+
+# Editors / OS
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.swp
+
+# Logs
+*.log
+
+# Environment / secrets — never commit
+.env
+.env.local
+.env.*.local
+
+# Downloaded gov data and SQLite DB. The corpus is regeneratable from war.gov
+# via `pnpm refresh`; we don't ship it. Manifest snapshots live here too —
+# also regeneratable on demand.
+/data/

@@ -1,0 +1,14 @@
+{
+  "name": "disclosure",
+  "version": "0.1.0",
+  "private": true,
+  "description": "UFO/UAP disclosure archive monorepo",
+  "scripts": {
+    "typecheck": "pnpm -r run typecheck"
+  },
+  "engines": {
+    "node": ">=20.19",
+    "pnpm": ">=9"
+  },
+  "packageManager": "pnpm@9.15.9"
+}
