@@ -10,7 +10,8 @@
     "index:fast": "pnpm --filter @disclosure/indexer run dev",
     "classify": "pnpm --filter @disclosure/classifier run dev",
     "typecheck": "pnpm -r run typecheck",
-    "test": "pnpm -r run test"
+    "test": "pnpm -r run test",
+    "render": "node scripts/render-html.mjs"
   },
   "engines": {
     "node": ">=20.19",
@@ -18,6 +19,7 @@
   },
   "packageManager": "pnpm@9.15.9",
   "devDependencies": {
+    "marked": "^18.0.3",
     "vitest": "^4.1.5"
   }
 }
