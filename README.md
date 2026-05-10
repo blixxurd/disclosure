@@ -22,6 +22,8 @@ packages/
 data/           Local mirror — gitignored. SQLite DB + downloaded files + manifest snapshots
 docs/
   SCHEMA.md     Database schema + change-detection design
+analysis/
+  release-01.md Whitepaper: four-layer reading of Release 01 (content, metadata, absences, process artifacts)
 ```
 
 ## Prereqs
