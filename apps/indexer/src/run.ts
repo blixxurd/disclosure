@@ -3,7 +3,13 @@ import pLimit from 'p-limit';
 import { Db, type FileRow, type FileMetadataInput } from '@disclosure/shared/db';
 import { DATA_ROOT } from '@disclosure/shared/config';
 import { createLogger } from '@disclosure/shared/log';
-import { pdfInfo, decryptPdfInPlace, extractPdfText, looksLikeScan } from './pdf.js';
+import {
+  pdfInfo,
+  decryptPdfInPlace,
+  extractPdfText,
+  looksLikeScan,
+  repairPdfWithGhostscript,
+} from './pdf.js';
 import { ocrPdf } from './ocr.js';
 import { readExif, shutdownExif, pickSharedFields } from './exif.js';
 
@@ -143,94 +149,127 @@ async function indexPdf(args: {
   ocr: boolean;
 }): Promise<IndexResult> {
   const { db, file, path, base, ocr } = args;
-  let info = await pdfInfo(path);
-  if (!info) {
-    return { metadataWritten: false, textWritten: false, decrypted: false, skipped: false };
-  }
 
-  // Decrypt if soft-encrypted with print allowed (gov ships these as
-  // copy:no but print:yes; qpdf strips the restriction trivially).
-  let decrypted = false;
-  if (info.encrypted && info.permissionsAllowPrint && !info.permissionsAllowCopy) {
-    log.debug('decrypting PDF', { file_id: file.id, path });
-    const dr = await decryptPdfInPlace(path);
-    if (dr) {
-      db.setFilePostDecrypt({
-        id: file.id,
-        pre_decrypt_sha256: dr.preDecryptSha256,
-        new_sha256: dr.newSha256,
-        new_size_bytes: dr.newSizeBytes,
+  // Some PDFs (D63/D64/D65 in Release 01) are malformed at the poppler
+  // parse level — pdfinfo, pdftotext, pdftoppm all error out. Ghostscript's
+  // parser is more permissive and re-renders them cleanly. When pdfInfo
+  // fails on the original, repair via gs and use the repaired path for all
+  // subsequent extraction. Decryption can't run on a repaired PDF (the gov
+  // file's encryption is bypassed by the rewrite), but these specific files
+  // aren't encrypted anyway.
+  let workingPath = path;
+  let info = await pdfInfo(workingPath);
+  let repairCleanup: (() => void) | null = null;
+  let repaired = false;
+
+  try {
+    if (!info) {
+      const r = await repairPdfWithGhostscript(path);
+      if (!r) {
+        return { metadataWritten: false, textWritten: false, decrypted: false, skipped: false };
+      }
+      workingPath = r.path;
+      repairCleanup = r.cleanup;
+      repaired = true;
+      info = await pdfInfo(workingPath);
+      if (!info) {
+        log.warn('pdfinfo failed even after gs repair', { file_id: file.id });
+        return { metadataWritten: false, textWritten: false, decrypted: false, skipped: false };
+      }
+      log.info('repaired malformed PDF via ghostscript', { file_id: file.id });
+    }
+
+    // Decrypt if soft-encrypted with print allowed. Skip when working off a
+    // ghostscript-repaired file — that rewrite already strips encryption.
+    let decrypted = false;
+    if (
+      !repaired &&
+      info.encrypted &&
+      info.permissionsAllowPrint &&
+      !info.permissionsAllowCopy
+    ) {
+      log.debug('decrypting PDF', { file_id: file.id, path: workingPath });
+      const dr = await decryptPdfInPlace(workingPath);
+      if (dr) {
+        db.setFilePostDecrypt({
+          id: file.id,
+          pre_decrypt_sha256: dr.preDecryptSha256,
+          new_sha256: dr.newSha256,
+          new_size_bytes: dr.newSizeBytes,
+        });
+        decrypted = true;
+        info = (await pdfInfo(workingPath)) ?? info;
+      }
+    }
+
+    // Try the embedded text layer first.
+    let extractedText: string | null = null;
+    let textSource: 'pdf-text-layer' | 'tesseract-ocr' | null = null;
+    const layerText = await extractPdfText(workingPath);
+    const isScan = layerText !== null && looksLikeScan(layerText, info.pages);
+    if (layerText !== null && !isScan) {
+      extractedText = layerText;
+      textSource = 'pdf-text-layer';
+    } else if (ocr) {
+      log.debug('running OCR on PDF', { file_id: file.id, pages: info.pages });
+      const result = await ocrPdf(workingPath, { pageCount: info.pages });
+      if (result) {
+        extractedText = result.text;
+        textSource = 'tesseract-ocr';
+      }
+    } else {
+      log.debug('skipping OCR (run with --ocr to extract scanned text)', {
+        file_id: file.id,
+        pages: info.pages,
       });
-      decrypted = true;
-      // Re-read pdfinfo on the decrypted file (encryption flag now off).
-      info = (await pdfInfo(path)) ?? info;
     }
-  }
 
-  // Try the embedded text layer first.
-  let extractedText: string | null = null;
-  let textSource: 'pdf-text-layer' | 'tesseract-ocr' | null = null;
-  const layerText = await extractPdfText(path);
-  const isScan = layerText !== null && looksLikeScan(layerText, info.pages);
-  if (layerText !== null && !isScan) {
-    extractedText = layerText;
-    textSource = 'pdf-text-layer';
-  } else if (ocr) {
-    // Rasterize + OCR. Slow — only runs when --ocr is set.
-    log.debug('running OCR on PDF', { file_id: file.id, pages: info.pages });
-    const result = await ocrPdf(path);
-    if (result) {
-      extractedText = result.text;
-      textSource = 'tesseract-ocr';
+    // exiftool runs on the original (gov-shipped) bytes so it can read XMP
+    // even when we needed gs-repair to extract pdfinfo. For non-repaired
+    // files this is just `path` unchanged.
+    const tags = await readExif(path);
+    const shared = tags ? pickSharedFields(tags) : blankShared();
+
+    const md: FileMetadataInput = {
+      ...base,
+      format: 'application/pdf',
+      pdf_pages: info.pages,
+      pdf_creator: info.creator,
+      pdf_producer: info.producer,
+      pdf_title: info.title,
+      pdf_author: info.author,
+      pdf_created_at: info.createdAt,
+      pdf_modified_at: info.modifiedAt,
+      pdf_encrypted: info.encrypted ? 1 : 0,
+      pdf_permissions: info.permissions,
+      pdf_is_scan: isScan ? 1 : 0,
+      width: shared.width,
+      height: shared.height,
+      exif_make: shared.exif_make,
+      exif_model: shared.exif_model,
+      exif_software: shared.exif_software,
+      exif_taken_at: shared.exif_taken_at,
+      gps_latitude: shared.gps_latitude,
+      gps_longitude: shared.gps_longitude,
+      gps_altitude: shared.gps_altitude,
+      raw_metadata_json: tags ? JSON.stringify(tags) : JSON.stringify(info.raw),
+    };
+    db.upsertFileMetadata(md);
+
+    let textWritten = false;
+    if (extractedText !== null && textSource !== null && extractedText.trim().length > 0) {
+      db.upsertFileText({
+        file_id: file.id,
+        text: extractedText,
+        source: textSource,
+      });
+      textWritten = true;
     }
-  } else {
-    log.debug('skipping OCR (run with --ocr to extract scanned text)', {
-      file_id: file.id,
-      pages: info.pages,
-    });
+
+    return { metadataWritten: true, textWritten, decrypted, skipped: false };
+  } finally {
+    repairCleanup?.();
   }
-
-  // exiftool gives us XMP and any extra metadata pdfinfo missed.
-  const tags = await readExif(path);
-  const shared = tags ? pickSharedFields(tags) : blankShared();
-
-  const md: FileMetadataInput = {
-    ...base,
-    format: 'application/pdf',
-    pdf_pages: info.pages,
-    pdf_creator: info.creator,
-    pdf_producer: info.producer,
-    pdf_title: info.title,
-    pdf_author: info.author,
-    pdf_created_at: info.createdAt,
-    pdf_modified_at: info.modifiedAt,
-    pdf_encrypted: info.encrypted ? 1 : 0,
-    pdf_permissions: info.permissions,
-    pdf_is_scan: isScan ? 1 : 0,
-    width: shared.width,
-    height: shared.height,
-    exif_make: shared.exif_make,
-    exif_model: shared.exif_model,
-    exif_software: shared.exif_software,
-    exif_taken_at: shared.exif_taken_at,
-    gps_latitude: shared.gps_latitude,
-    gps_longitude: shared.gps_longitude,
-    gps_altitude: shared.gps_altitude,
-    raw_metadata_json: tags ? JSON.stringify(tags) : JSON.stringify(info.raw),
-  };
-  db.upsertFileMetadata(md);
-
-  let textWritten = false;
-  if (extractedText !== null && textSource !== null && extractedText.trim().length > 0) {
-    db.upsertFileText({
-      file_id: file.id,
-      text: extractedText,
-      source: textSource,
-    });
-    textWritten = true;
-  }
-
-  return { metadataWritten: true, textWritten, decrypted, skipped: false };
 }
 
 async function indexImage(args: {

@@ -4,7 +4,9 @@
 // pdfinfo output is line-based "Field: value" pairs. We parse the ones we
 // care about and stash the raw output too.
 
-import { renameSync, unlinkSync } from 'node:fs';
+import { mkdtempSync, renameSync, rmSync, unlinkSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { resolve as pathResolve } from 'node:path';
 import { sha256OfFile, sizeOfFile } from '@disclosure/shared/util';
 import { createLogger } from '@disclosure/shared/log';
 import { runCmd } from './util.js';
@@ -129,4 +131,50 @@ export function looksLikeScan(text: string, pages: number | null): boolean {
   if (!pages || pages < 1) return false;
   const chars = text.replace(/\s+/g, '').length;
   return chars / pages < 10;
+}
+
+export interface RepairedPdf {
+  path: string;
+  cleanup: () => void;
+}
+
+// Some gov PDFs (e.g. Mission Reports D63/D64/D65) are malformed in ways
+// that poppler's parser rejects with "Unterminated string" / "End of file
+// inside dictionary" — but ghostscript's parser is more permissive and
+// re-renders them cleanly. Use this as a last-resort fallback before
+// declaring a PDF unindexable.
+export async function repairPdfWithGhostscript(srcPath: string): Promise<RepairedPdf | null> {
+  const workdir = mkdtempSync(pathResolve(tmpdir(), 'disclosure-repair-'));
+  const repairedPath = pathResolve(workdir, 'repaired.pdf');
+  const r = await runCmd(
+    'gs',
+    [
+      '-q',
+      '-dNOPAUSE',
+      '-dBATCH',
+      '-sDEVICE=pdfwrite',
+      `-sOutputFile=${repairedPath}`,
+      srcPath,
+    ],
+    { timeoutMs: 5 * 60_000 },
+  );
+  if (r.code !== 0) {
+    log.warn('ghostscript repair failed', {
+      path: srcPath,
+      code: r.code,
+      stderr: r.stderr.trim().slice(0, 200),
+    });
+    rmSync(workdir, { recursive: true, force: true });
+    return null;
+  }
+  return {
+    path: repairedPath,
+    cleanup: () => {
+      try {
+        rmSync(workdir, { recursive: true, force: true });
+      } catch {
+        /* ignore */
+      }
+    },
+  };
 }
