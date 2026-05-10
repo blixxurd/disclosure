@@ -15,8 +15,8 @@ with the database, **the database wins**.
 | Records (after dedup of gov data quality bugs) | 158 |
 | Files downloaded | 288 (116 PDF, 14 IMG, 130 thumbnail, 28 video) |
 | Total bytes | 3.7 GB |
-| PDFs with extracted text | 89 (50 from text layer, 39 OCR'd) |
-| PDFs with no extractable text | 27 (24 photo-only PDFs, 3 corrupted) |
+| PDFs with extracted text | 92 (51 from text layer, 41 OCR'd) |
+| PDFs with no extractable text | 24 (24 photo-only PDFs; the 3 corrupted Mission Reports are now indexed via gs-repair fallback) |
 | Time-spanning earliest doc → release | March 11, 2002 → May 8, 2026 |
 
 Tier distribution (auto-classified):
@@ -211,14 +211,33 @@ to friction text extraction without preventing it (qpdf strips it
 trivially). The *intent* is to slow down analysts; the *effect* is
 notable on its own.
 
-### F14. Three Mission Reports are corrupted
+### F14. Three Mission Reports were corrupted; recoverable via ghostscript
 
 D63 (Strait of Hormuz, October 2020), D64 (Iran, November 2020), D65
 (Persian Gulf, July 2020) — all 2020 Middle East events — fail
-`pdftotext` with malformed-dictionary errors. They render in Preview
-but can't be parsed by standard tools. Could be sloppy redaction
-tooling that left invalid PDF objects, or could be intentional
-obfuscation.
+poppler's parser with malformed-dictionary errors ("Unterminated
+string", "Catalog dictionary does not contain a valid Pages entry").
+They render in Preview but `pdfinfo` / `pdftotext` / `pdftoppm` all
+reject them.
+
+`ghostscript -sDEVICE=pdfwrite` re-renders these files through gs's
+more permissive parser, producing PDFs that poppler accepts. The
+indexer auto-detects the parse-error condition and uses gs as a
+fallback. As of 2026-05-10 all three are fully indexed and searchable:
+
+- **D63** (8 pages): OCR'd via tesseract on the gs-repaired file →
+  ~8.9KB text. Captures the full mission narrative including the
+  "OBSERVED 1X UAP, SEE OBSERVATION LINE 1" event at 1829Z, mission
+  durations, and the IMINT line.
+- **D64** (7 pages): text-layer extracted from the gs-repaired file →
+  ~11.8KB text.
+- **D65** (8 pages): OCR'd via tesseract on the gs-repaired file →
+  ~8.2KB text.
+
+The corruption itself is the data point worth keeping — it's *consistent*
+across three docs of the same era and same theater (Middle East 2020),
+which suggests a particular redaction-tooling pipeline that produced
+malformed PDF output. Not random.
 
 ## Notable absences
 

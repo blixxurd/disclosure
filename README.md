@@ -38,11 +38,12 @@ docs/
 
 **CLI binaries** (used by the indexer; install once via Homebrew):
 ```sh
-brew install poppler qpdf tesseract
+brew install poppler qpdf tesseract ghostscript
 ```
 - `poppler` provides `pdfinfo`, `pdftotext`, `pdftoppm`
 - `qpdf` decrypts soft-encrypted gov PDFs (the gov ships them with `print:yes copy:no`)
 - `tesseract` OCRs scanned PDFs
+- `ghostscript` repairs the few gov PDFs that poppler's parser rejects (e.g. Mission Reports D63/D64/D65)
 
 `exiftool` is bundled via npm (`exiftool-vendored`); no system install needed.
 

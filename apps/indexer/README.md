@@ -8,7 +8,7 @@ FTS5 index. Run *after* `@disclosure/downloader`.
 
 | Kind | Pipeline |
 |---|---|
-| **PDF** | `pdfinfo` (Info dict) → `qpdf --decrypt` if soft-encrypted → `pdftotext` for the text layer → `tesseract` OCR (only if `--ocr` and the text layer is missing/scan-thin) → `exiftool` for XMP / extra metadata → write to `file_metadata` + `file_text` |
+| **PDF** | `pdfinfo` (Info dict) — fallback to `gs -sDEVICE=pdfwrite` repair if poppler can't parse the file → `qpdf --decrypt` if soft-encrypted → `pdftotext` for the text layer → `tesseract` OCR (only if `--ocr` and the text layer is missing/scan-thin; auto-tunes 200dpi for >50 page docs, 150dpi otherwise) → `exiftool` for XMP / extra metadata → write to `file_metadata` + `file_text` |
 | **Image** (`.jpg/.png`) | `exiftool` → `file_metadata` |
 | **Thumbnail** | `exiftool` → `file_metadata` |
 | **Video** (`.mp4`) | `exiftool` → `file_metadata` (codec, duration, fps, bitrate, audio params) |
@@ -26,12 +26,13 @@ intentional friction against text extraction, not a real security boundary.
 ## System dependencies
 
 ```sh
-brew install poppler qpdf tesseract
+brew install poppler qpdf tesseract ghostscript
 ```
 
 - **poppler** — provides `pdfinfo`, `pdftotext`, `pdftoppm`
 - **qpdf** — strips soft restrictions from gov PDFs
 - **tesseract** — OCRs scanned PDFs (only used with `--ocr`)
+- **ghostscript** — repairs malformed PDFs that poppler's parser rejects (D63/D64/D65 in Release 01). Only used as a fallback when poppler errors with a parse error.
 - **exiftool** — bundled via `exiftool-vendored` (no system install)
 
 If a binary is missing, the indexer logs a warning and skips that step.
@@ -136,9 +137,13 @@ password-protected, not just permission-restricted. Skip is the right
 behavior; the original file stays untouched.
 
 **Mission Reports D63/D64/D65** (Strait of Hormuz / Iran / Persian Gulf
-2020) fail `pdftotext` with "Unterminated string" / "Dictionary key must
-be a name object". These are malformed in the gov's source. `qpdf
---check` may be able to repair them; not currently automated.
+2020) fail poppler's parser ("Unterminated string" / "Dictionary key must
+be a name object" / "Catalog dictionary does not contain a valid Pages
+entry"). These are malformed in the gov's source. The indexer detects
+parse errors and falls back to `gs -sDEVICE=pdfwrite` to render through
+ghostscript, which has a more permissive parser. As of 2026-05-10 all
+three PDFs are fully indexed (D63: ~8.9KB OCR text; D64: ~11.8KB
+text-layer extracted from gs-repaired output; D65: ~8.2KB OCR).
 
 **`spawn ENOENT`** for a system binary: `brew install` it (see top).
 The indexer continues without that step on missing binaries.
