@@ -1,0 +1,51 @@
+---
+import type { FileEntry } from '../lib/types.js';
+
+interface Props {
+  file: FileEntry;
+}
+
+const { file } = Astro.props;
+
+// data/files/release_1/pdfs/foo.pdf → /files/release_1/pdfs/foo.pdf
+function toFileHref(localPath: string | null): string | null {
+  if (!localPath) return null;
+  return '/files/' + localPath.replace(/^files\//, '');
+}
+
+const href = toFileHref(file.local_path);
+---
+
+{href && file.kind === 'pdf' && (
+  <div class="rounded border my-3" style="border-color: var(--color-rule); background: var(--color-paper);">
+    <embed src={href} type="application/pdf" style="width: 100%; height: min(80vh, 700px); display: block; border-radius: 4px;" />
+    <div class="label-mono p-2 border-t" style="color: var(--color-faint); border-color: var(--color-rule);">
+      <a href={href} target="_blank" rel="noreferrer">Open PDF in new tab ↗</a>
+    </div>
+  </div>
+)}
+
+{href && file.kind === 'video' && (
+  <div class="rounded border my-3" style="border-color: var(--color-rule); background: var(--color-paper);">
+    <video controls preload="metadata" style="width: 100%; max-height: 80vh; display: block;" src={href}></video>
+    <div class="label-mono p-2 border-t" style="color: var(--color-faint); border-color: var(--color-rule);">
+      <a href={href} target="_blank" rel="noreferrer">Open video in new tab ↗</a>
+    </div>
+  </div>
+)}
+
+{href && (file.kind === 'image' || file.kind === 'thumbnail') && (
+  <div class="rounded border my-3 overflow-hidden" style="border-color: var(--color-rule); background: var(--color-paper);">
+    <img src={href} loading="lazy" style="width: 100%; height: auto; display: block;" alt="" />
+    <div class="label-mono p-2 border-t" style="color: var(--color-faint); border-color: var(--color-rule);">
+      <a href={href} target="_blank" rel="noreferrer">Open image in new tab ↗</a>
+    </div>
+  </div>
+)}
+
+{!href && (
+  <div class="rounded border p-3 my-2" style="border-color: var(--color-rule); background: var(--color-paper);">
+    <div class="label-mono mb-1">{file.kind} · {file.source_system}</div>
+    <a href={file.source_url} target="_blank" rel="noreferrer">Open at source ↗</a>
+  </div>
+)}

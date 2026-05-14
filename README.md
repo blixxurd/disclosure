@@ -16,7 +16,7 @@ apps/
   downloader/   Fetches manifest CSV + every linked file from war.gov + DVIDS
   indexer/      Decrypts PDFs, extracts metadata + text (incl. OCR), populates FTS5
   classifier/   Applies keyword + metadata rules, writes per-record findings to user_record_meta
-  web/          (later) The public-facing site
+  web/          Astro reading-room frontend — local dev only for now (pnpm web)
 packages/
   shared/       (later) Shared TypeScript types
 data/           Local mirror — gitignored. SQLite DB + downloaded files + manifest snapshots

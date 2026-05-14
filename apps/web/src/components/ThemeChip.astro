@@ -1,0 +1,31 @@
+---
+import type { Theme } from '../lib/types.js';
+
+interface Props {
+  theme: Theme;
+}
+
+const { theme } = Astro.props;
+
+// Compact, human-friendly labels.
+const labels: Record<Theme, string> = {
+  'explicit-et': 'explicit ET',
+  'cover-story': 'cover story',
+  'anomaly-class': 'anomaly classification',
+  'material-recovery': 'material recovery',
+  'astronaut-obs': 'astronaut obs.',
+  'intl-tracking': 'intl. tracking',
+  'provenance': 'provenance',
+  'pre-disclosure-age': 'pre-disclosure age',
+  'redaction-artifact': 'redaction artifact',
+  'historical-canon': 'historical canon',
+  'curation-absence': 'curation absence',
+};
+---
+
+<span
+  class="inline-block rounded-sm px-2 py-0.5"
+  style="font-size: 0.72rem; color: var(--color-muted); background: var(--color-rule); letter-spacing: 0.02em;"
+>
+  {labels[theme]}
+</span>

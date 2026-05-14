@@ -1,0 +1,90 @@
+---
+import Base from '../layouts/Base.astro';
+import RecordCard from '../components/RecordCard.astro';
+import TierBadge from '../components/TierBadge.astro';
+import { listRecords, recordsAtTier } from '../lib/records.js';
+
+const records = listRecords();
+const t1 = recordsAtTier('T1');
+
+const totals = {
+  records: records.length,
+  pdfs: records.filter((r) => r.pdf_path).length,
+  videos: records.filter((r) => r.video_path).length,
+  t1: recordsAtTier('T1').length,
+  t2: recordsAtTier('T2').length,
+  t3: recordsAtTier('T3').length,
+};
+
+interface StatTile { n: number; l: string; sub: string }
+const stats: StatTile[] = [
+  { n: totals.records, l: 'records', sub: '79-year arc' },
+  { n: totals.pdfs, l: 'PDFs', sub: 'decrypted + indexed' },
+  { n: totals.videos, l: 'videos', sub: 'from DVIDS' },
+  { n: totals.t1 + totals.t2 + totals.t3, l: 'significant findings', sub: 'T1 + T2 + T3' },
+];
+---
+
+<Base>
+  <section class="mb-12 max-w-3xl">
+    <div class="label-mono mb-3" style="color: var(--color-faint);">
+      [UNCLASSIFIED] · Mirror of war.gov/UFO Release 01 · 2026-05-08
+    </div>
+    <h1 class="font-bold tracking-tight mb-4" style="font-size: clamp(2rem, 6vw, 2.8rem); line-height: 1.05; letter-spacing: -0.015em;">
+      A reading room for the<br />Department of War's UAP files.
+    </h1>
+    <p class="text-lg mb-2" style="color: var(--color-muted); line-height: 1.55;">
+      Every document the War Department posted at <a href="https://www.war.gov/UFO/" rel="noreferrer">war.gov/UFO</a>,
+      decrypted, OCR'd, classified, and rendered for actual reading.
+    </p>
+  </section>
+
+  <section class="mb-14 grid gap-4 sm:grid-cols-2 md:grid-cols-4">
+    {stats.map((s) => (
+      <div class="rounded border p-4" style="border-color: var(--color-rule); background: var(--color-paper);">
+        <div class="font-bold tracking-tight" style="font-size: 2rem; line-height: 1;">{s.n}</div>
+        <div class="mt-1" style="color: var(--color-fg);">{s.l}</div>
+        <div class="label-mono mt-1" style="color: var(--color-faint);">{s.sub}</div>
+      </div>
+    ))}
+  </section>
+
+  <section class="mb-12">
+    <div class="flex items-baseline justify-between gap-4 mb-4 border-b pb-2" style="border-color: var(--color-rule);">
+      <h2 class="font-bold tracking-tight" style="font-size: 1.4rem;">
+        Smoking gun · <TierBadge tier="T1" size="sm" />
+      </h2>
+      <a href="/records" class="label-mono">View all records →</a>
+    </div>
+    <p class="mb-5 max-w-2xl" style="color: var(--color-muted);">
+      The seven records where the U.S. government — in primary-source voice — invokes <em>extraterrestrial</em> as a working hypothesis, or where the Pentagon's modern intake form treats UAP as the institutionalized analytical category.
+    </p>
+    <div class="card-grid">
+      {t1.map((r) => <RecordCard record={r} />)}
+    </div>
+  </section>
+
+  <section class="mb-12 grid gap-4 md:grid-cols-3">
+    <a href="/records?tier=T2" class="rounded border p-4 transition" style="border-color: var(--color-rule); background: var(--color-paper); color: inherit;">
+      <div class="mb-2"><TierBadge tier="T2" size="sm" /></div>
+      <div class="font-bold" style="font-size: 1.1rem;">Strong signal · {totals.t2}</div>
+      <p class="mt-1 text-sm" style="color: var(--color-muted);">
+        Cover-story tracking. Material recovery. The institutionalized "anomalous characteristics" form.
+      </p>
+    </a>
+    <a href="/records?tier=T3" class="rounded border p-4 transition" style="border-color: var(--color-rule); background: var(--color-paper); color: inherit;">
+      <div class="mb-2"><TierBadge tier="T3" size="sm" /></div>
+      <div class="font-bold" style="font-size: 1.1rem;">Notable / forensic · {totals.t3}</div>
+      <p class="mt-1 text-sm" style="color: var(--color-muted);">
+        Provenance fingerprints. Adobe Illustrator on Apollo photos. Hand-built manifest.
+      </p>
+    </a>
+    <a href="/search" class="rounded border p-4 transition" style="border-color: var(--color-rule); background: var(--color-paper); color: inherit;">
+      <div class="label-mono mb-2">→</div>
+      <div class="font-bold" style="font-size: 1.1rem;">Search the corpus</div>
+      <p class="mt-1 text-sm" style="color: var(--color-muted);">
+        Full-text across 4.9M characters of extracted text. FTS5 phrases supported.
+      </p>
+    </a>
+  </section>
+</Base>

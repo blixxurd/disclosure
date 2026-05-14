@@ -11,7 +11,8 @@
     "classify": "pnpm --filter @disclosure/classifier run dev",
     "typecheck": "pnpm -r run typecheck",
     "test": "pnpm -r run test",
-    "render": "node scripts/render-html.mjs"
+    "render": "node scripts/render-html.mjs",
+    "web": "pnpm --filter @disclosure/web run dev"
   },
   "engines": {
     "node": ">=20.19",

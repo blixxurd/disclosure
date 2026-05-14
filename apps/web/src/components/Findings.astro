@@ -1,0 +1,51 @@
+---
+import type { Finding } from '../lib/types.js';
+import TierBadge from './TierBadge.astro';
+
+interface Props {
+  findings: Finding[];
+}
+const { findings } = Astro.props;
+
+// Group by tier so the visual hierarchy mirrors the analytical hierarchy.
+const TIER_ORDER = ['T1', 'T2', 'T3', 'T4', 'T5'] as const;
+const grouped = TIER_ORDER.map((tier) => ({
+  tier,
+  items: findings.filter((f) => f.tier === tier),
+})).filter((g) => g.items.length > 0);
+---
+
+{grouped.length > 0 && (
+  <div class="flex flex-col gap-4">
+    {grouped.map((group) => (
+      <div>
+        <div class="mb-2"><TierBadge tier={group.tier} size="sm" /></div>
+        <ul class="flex flex-col gap-2 list-none p-0 m-0">
+          {group.items.map((f) => (
+            <li
+              class="border-l-2 pl-3 py-1"
+              style="border-color: var(--color-rule);"
+            >
+              <div class="text-sm font-medium" style="line-height: 1.4;">{f.label}</div>
+              {f.snippet && (
+                <div
+                  class="mt-1 italic"
+                  style="font-size: 0.85rem; color: var(--color-muted); line-height: 1.5;"
+                  set:html={f.snippet
+                    .replace(/&/g, '&amp;')
+                    .replace(/</g, '&lt;')
+                    .replace(/>/g, '&gt;')
+                    .replace(/&lt;&lt;/g, '<mark style="background: var(--color-t1-bg); color: var(--color-t1); padding: 0 2px; border-radius: 2px;">')
+                    .replace(/&gt;&gt;/g, '</mark>')}
+                />
+              )}
+              <div class="label-mono mt-1" style="color: var(--color-faint); font-size: 0.65rem;">
+                {f.rule_id} · {f.source}
+              </div>
+            </li>
+          ))}
+        </ul>
+      </div>
+    ))}
+  </div>
+)}

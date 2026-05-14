@@ -1,0 +1,71 @@
+---
+import Base from '../layouts/Base.astro';
+import { listRecords } from '../lib/records.js';
+
+const records = listRecords();
+const stats = {
+  records: records.length,
+  pdfs: records.filter((r) => r.pdf_path).length,
+  videos: records.filter((r) => r.video_path).length,
+  t1: records.filter((r) => r.classification?.tier === 'T1').length,
+  t2: records.filter((r) => r.classification?.tier === 'T2').length,
+  t3: records.filter((r) => r.classification?.tier === 'T3').length,
+  t5: records.filter((r) => r.classification?.tier === 'T5').length,
+};
+---
+
+<Base title="About · Disclosure">
+  <div class="prose mx-auto" style="max-width: 720px;">
+    <div class="label-mono mb-3" style="color: var(--color-faint);">
+      [UNCLASSIFIED] · Re-rendered for legibility · 2026
+    </div>
+    <h1 class="font-bold tracking-tight mb-4" style="font-size: 2rem; line-height: 1.15;">About this archive</h1>
+
+    <p>
+      On May 8, 2026, the Department of War posted Release 01 at <a href="https://www.war.gov/UFO/" rel="noreferrer">war.gov/UFO</a> —
+      158 records spread across PDFs, images, and DVIDS videos. The originals are encrypted with
+      copy-restrictions, hosted behind an Akamai bot-block, and scattered across a Vue
+      single-page app. This site is a complete local mirror, decrypted, OCR'd, classified,
+      and rendered as something you can actually read.
+    </p>
+
+    <h2 class="font-bold mt-8 mb-2" style="font-size: 1.25rem;">What's been done</h2>
+    <ul>
+      <li>Every file downloaded directly from war.gov (via real Chrome — Akamai 403s every other client).</li>
+      <li>Soft-encrypted PDFs decrypted with <code>qpdf</code>; original sha256 preserved as <code>pre_decrypt_sha256</code> so verifiability stays intact.</li>
+      <li>Text extracted via <code>pdftotext</code> for born-digital docs, <code>tesseract</code> OCR for scans, with a <code>ghostscript</code> fallback for the three malformed Mission Reports poppler couldn't parse.</li>
+      <li>Metadata extracted via <code>exiftool</code>: creator/producer/dates, EXIF on images, codec/duration on videos.</li>
+      <li>Records auto-classified into a 5-tier system based on keyword and metadata rules; results stored separately from the gov data so they can be overridden.</li>
+      <li>~4.9 million characters of extracted text indexed via SQLite FTS5 for full-text search.</li>
+    </ul>
+
+    <h2 class="font-bold mt-8 mb-2" style="font-size: 1.25rem;">The 5-tier classification</h2>
+    <p>Records are auto-classified by tier with the highest-tier finding winning:</p>
+    <ul>
+      <li><strong>T1 · Smoking gun</strong> ({stats.t1} records) — primary-source US government document, in its own voice, making an extraordinary claim.</li>
+      <li><strong>T2 · Strong signal</strong> ({stats.t2} records) — direct evidence of a coordinated program, pattern, or institutional behavior.</li>
+      <li><strong>T3 · Notable / forensic</strong> ({stats.t3} records) — provenance or forensic clue from metadata.</li>
+      <li><strong>T4 · Historical canon</strong> (0 records — subsumed) — classic cases (Maury Island, Roswell, Blue Book). Every match in this corpus also hit a higher tier.</li>
+      <li><strong>T5 · Context</strong> ({stats.t5} records) — tangential material swept into the disclosure.</li>
+    </ul>
+
+    <h2 class="font-bold mt-8 mb-2" style="font-size: 1.25rem;">Methodology and caveats</h2>
+    <ul>
+      <li>OCR'd text from scanned material carries noise — verify against the source PDF (linked from each record) before quoting externally.</li>
+      <li>Tier assignments are first-pass and not editorial judgments. Some records straddle multiple tiers; the highest applicable one wins.</li>
+      <li>Filename-derived natural keys are stable per record; URLs are deterministic, suitable for citation.</li>
+      <li>Original gov data quality issues (year typos, duplicate rows, malformed PDFs) are documented as findings rather than silently fixed.</li>
+    </ul>
+
+    <h2 class="font-bold mt-8 mb-2" style="font-size: 1.25rem;">Source</h2>
+    <p>
+      Code at <a href="https://github.com/blixxurd/disclosure" rel="noreferrer">github.com/blixxurd/disclosure</a> (private).
+      The whole pipeline (download → index → classify → web) is reproducible with
+      <code>pnpm refresh &amp;&amp; pnpm web</code>. When the gov posts Release 02, the corpus rebuilds incrementally.
+    </p>
+
+    <p class="label-mono mt-12" style="color: var(--color-faint);">
+      Not affiliated with the U.S. government, war.gov, AARO, DVIDS, or anyone else with a TLA.
+    </p>
+  </div>
+</Base>

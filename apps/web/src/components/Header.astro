@@ -1,0 +1,24 @@
+---
+const pathname = Astro.url.pathname;
+function isActive(p: string): boolean {
+  if (p === '/') return pathname === '/';
+  return pathname.startsWith(p);
+}
+---
+
+<header class="border-b" style="border-color: var(--color-rule); background: var(--color-paper);">
+  <div class="page" style="padding-top: 0.9rem; padding-bottom: 0.9rem;">
+    <div class="flex items-center justify-between gap-4">
+      <a href="/" class="flex items-baseline gap-3" style="color: inherit;">
+        <span class="font-bold tracking-tight" style="font-size: 1.15rem;">DISCLOSURE</span>
+        <span class="label-mono">// MIRROR-01 // 2026-05-08</span>
+      </a>
+
+      <nav class="flex items-center gap-4 label-mono" aria-label="Primary">
+        <a href="/records" class:list={[isActive('/records') && 'underline']}>Records</a>
+        <a href="/search" class:list={[isActive('/search') && 'underline']}>Search</a>
+        <a href="/about" class:list={[isActive('/about') && 'underline']}>About</a>
+      </nav>
+    </div>
+  </div>
+</header>

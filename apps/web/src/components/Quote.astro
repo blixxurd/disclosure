@@ -1,0 +1,19 @@
+---
+interface Props {
+  source?: string;
+  text: string;
+}
+const { source, text } = Astro.props;
+---
+
+<figure class="my-6">
+  <blockquote
+    class="border-l-4 italic px-4 py-3 rounded"
+    style="border-color: var(--color-quote-bar); background: var(--color-quote-bg); font-family: var(--font-serif); line-height: 1.7;"
+  >
+    {text}
+  </blockquote>
+  {source && (
+    <figcaption class="label-mono mt-1" style="color: var(--color-faint);">— {source}</figcaption>
+  )}
+</figure>

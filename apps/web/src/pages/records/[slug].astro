@@ -1,0 +1,153 @@
+---
+import Base from '../../layouts/Base.astro';
+import TierBadge from '../../components/TierBadge.astro';
+import ThemeChip from '../../components/ThemeChip.astro';
+import MetadataTable from '../../components/MetadataTable.astro';
+import Findings from '../../components/Findings.astro';
+import FileEmbed from '../../components/FileEmbed.astro';
+import { getRecordBySlug } from '../../lib/records.js';
+
+const { slug } = Astro.params;
+if (!slug) return Astro.redirect('/records');
+
+const record = getRecordBySlug(slug);
+if (!record) {
+  return new Response('Record not found', { status: 404 });
+}
+
+const cls = record.classification;
+const title = record.title ?? 'Untitled record';
+const TEXT_PREVIEW_LIMIT = 4000;
+const previewText = record.text?.text.slice(0, TEXT_PREVIEW_LIMIT);
+const hasMoreText = (record.text?.text.length ?? 0) > TEXT_PREVIEW_LIMIT;
+---
+
+<Base title={`${title} · Disclosure`}>
+  <div class="mb-8">
+    <a href="/records" class="label-mono">← All records</a>
+  </div>
+
+  <header class="mb-10 pb-6 border-b" style="border-color: var(--color-rule);">
+    <div class="flex flex-wrap items-center gap-2 mb-3">
+      <TierBadge tier={cls?.tier ?? null} size="sm" />
+      {record.primary_type && (
+        <span class="label-mono" style="color: var(--color-faint);">
+          {record.primary_type}
+        </span>
+      )}
+      {record.agency && (
+        <span class="label-mono" style="color: var(--color-faint);">
+          · {record.agency}
+        </span>
+      )}
+    </div>
+
+    <h1
+      class="font-bold tracking-tight mb-3"
+      style="font-size: clamp(1.6rem, 4vw, 2.2rem); line-height: 1.2; letter-spacing: -0.01em; word-break: break-word;"
+    >
+      {title}
+    </h1>
+
+    <div class="label-mono flex flex-wrap gap-x-4 gap-y-1" style="color: var(--color-muted);">
+      {record.incident_date && record.incident_date !== 'N/A' && (
+        <span>Incident: {record.incident_date}</span>
+      )}
+      {record.incident_loc && record.incident_loc !== 'N/A' && (
+        <span>Location: {record.incident_loc}</span>
+      )}
+      {record.release_date && <span>Released: {record.release_date}</span>}
+    </div>
+
+    {(cls?.themes ?? []).length > 0 && (
+      <div class="flex flex-wrap gap-1 mt-4">
+        {cls?.themes.map((t) => <ThemeChip theme={t} />)}
+      </div>
+    )}
+  </header>
+
+  {record.description && (
+    <section class="mb-10 max-w-2xl prose">
+      <p style="color: var(--color-fg);">{record.description}</p>
+    </section>
+  )}
+
+  <div class="grid gap-10" style="grid-template-columns: 1fr;">
+    <div style="display: contents;">
+      <section class="mb-2" style="grid-column: 1;">
+        <h2 class="font-bold mb-3 pb-2 border-b" style="font-size: 1.05rem; letter-spacing: 0.02em; border-color: var(--color-rule); text-transform: uppercase; color: var(--color-muted);">
+          Files
+        </h2>
+        {record.files
+          .filter((f) => f.kind === 'pdf' || f.kind === 'video' || f.kind === 'image')
+          .map((f) => <FileEmbed file={f} />)}
+
+        {record.files.length > 0 && (
+          <details class="mt-3 rounded border" style="border-color: var(--color-rule); background: var(--color-paper);">
+            <summary class="label-mono cursor-pointer p-3" style="color: var(--color-muted);">
+              All file references ({record.files.length})
+            </summary>
+            <ul class="list-none p-0 m-0 px-3 pb-3 flex flex-col gap-2">
+              {record.files.map((f) => (
+                <li class="border-t pt-2" style="border-color: var(--color-rule);">
+                  <div class="flex items-center justify-between gap-3 mb-1 flex-wrap">
+                    <span class="label-mono">
+                      {f.kind} · {f.source_system}
+                    </span>
+                    <span class="label-mono" style="color: var(--color-faint);">
+                      {f.size_bytes ? `${(f.size_bytes / 1024 / 1024).toFixed(1)} MB` : ''}
+                    </span>
+                  </div>
+                  <div class="label-mono" style="color: var(--color-faint); font-size: 0.7rem; word-break: break-all;">
+                    {f.local_path ?? '(not downloaded)'}
+                    {f.pre_decrypt_sha256 && <span> · decrypted by indexer</span>}
+                    {' · '}
+                    <a href={f.source_url} target="_blank" rel="noreferrer" style="color: var(--color-faint);">source ↗</a>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          </details>
+        )}
+      </section>
+
+      {record.metadata && (
+        <section class="mb-2">
+          <h2 class="font-bold mb-3 pb-2 border-b" style="font-size: 1.05rem; letter-spacing: 0.02em; border-color: var(--color-rule); text-transform: uppercase; color: var(--color-muted);">
+            File metadata
+          </h2>
+          <MetadataTable metadata={record.metadata} />
+        </section>
+      )}
+
+      {(cls?.findings ?? []).length > 0 && (
+        <section class="mb-2">
+          <h2 class="font-bold mb-3 pb-2 border-b" style="font-size: 1.05rem; letter-spacing: 0.02em; border-color: var(--color-rule); text-transform: uppercase; color: var(--color-muted);">
+            Classification findings
+          </h2>
+          <Findings findings={cls?.findings ?? []} />
+        </section>
+      )}
+
+      {record.text && previewText && (
+        <section class="mb-2">
+          <h2 class="font-bold mb-3 pb-2 border-b" style="font-size: 1.05rem; letter-spacing: 0.02em; border-color: var(--color-rule); text-transform: uppercase; color: var(--color-muted);">
+            Extracted text
+            <span class="label-mono ml-2" style="color: var(--color-faint); font-size: 0.7rem;">
+              {record.text.source}
+            </span>
+          </h2>
+          <pre
+            class="rounded p-4 overflow-x-auto"
+            style="font-family: var(--font-mono); font-size: 0.8rem; line-height: 1.55; background: var(--color-paper); border: 1px solid var(--color-rule); white-space: pre-wrap; max-height: 600px; overflow-y: auto;"
+          >{previewText}{hasMoreText ? '\n\n[…]' : ''}</pre>
+          {hasMoreText && (
+            <div class="label-mono mt-2" style="color: var(--color-faint);">
+              Showing first {TEXT_PREVIEW_LIMIT.toLocaleString()} of {record.text.text.length.toLocaleString()} chars.
+            </div>
+          )}
+        </section>
+      )}
+    </div>
+  </div>
+</Base>

@@ -1,0 +1,53 @@
+---
+import type { RecordSummary } from '../lib/types.js';
+import { slugFromNaturalKey } from '../lib/records.js';
+import TierBadge from './TierBadge.astro';
+import ThemeChip from './ThemeChip.astro';
+
+interface Props {
+  record: RecordSummary;
+}
+const { record } = Astro.props;
+const slug = slugFromNaturalKey(record.natural_key);
+const href = `/records/${slug}`;
+
+// Trim very long titles for the card; full title shows on detail page.
+const title = (record.title ?? 'Untitled record').replace(/\s+/g, ' ').trim();
+const truncatedTitle = title.length > 110 ? title.slice(0, 107) + '…' : title;
+
+// Top 3 themes, prioritized.
+const themes = (record.classification?.themes ?? []).slice(0, 3);
+---
+
+<article class="rounded border p-4 transition" style="border-color: var(--color-rule); background: var(--color-paper);">
+  <a href={href} style="color: inherit;">
+    <div class="flex items-start justify-between gap-2 mb-2">
+      <TierBadge tier={record.classification?.tier ?? null} size="sm" />
+      {record.primary_type && (
+        <span class="label-mono" style="color: var(--color-faint);">
+          {record.primary_type}
+        </span>
+      )}
+    </div>
+
+    <h3 class="font-semibold leading-snug mb-2" style="font-size: 1rem;">
+      {truncatedTitle}
+    </h3>
+
+    <div class="label-mono mb-3" style="color: var(--color-muted);">
+      {record.agency ?? 'Unknown agency'}
+      {record.incident_date && record.incident_date !== 'N/A' && (
+        <> · {record.incident_date}</>
+      )}
+      {record.incident_loc && record.incident_loc !== 'N/A' && (
+        <> · {record.incident_loc}</>
+      )}
+    </div>
+
+    {themes.length > 0 && (
+      <div class="flex flex-wrap gap-1">
+        {themes.map((theme) => <ThemeChip theme={theme} />)}
+      </div>
+    )}
+  </a>
+</article>

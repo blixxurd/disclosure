@@ -23,3 +23,7 @@ Thumbs.db
 # via `pnpm refresh`; we don't ship it. Manifest snapshots live here too —
 # also regeneratable on demand.
 /data/
+
+# Whitepapers / analysis docs. Held locally for now; not part of the
+# committed repo. Re-add selectively if/when ready to share.
+/analysis/

@@ -1,0 +1,38 @@
+---
+import type { Tier } from '../lib/types.js';
+
+interface Props {
+  tier: Tier | null;
+  size?: 'sm' | 'md';
+}
+
+const { tier, size = 'md' } = Astro.props;
+
+const labels: Record<Tier, string> = {
+  T1: 'T1 · Smoking gun',
+  T2: 'T2 · Strong signal',
+  T3: 'T3 · Notable',
+  T4: 'T4 · Historical canon',
+  T5: 'T5 · Context',
+};
+const tones: Record<Tier, { fg: string; bg: string }> = {
+  T1: { fg: 'var(--color-t1)', bg: 'var(--color-t1-bg)' },
+  T2: { fg: 'var(--color-t2)', bg: 'var(--color-t2-bg)' },
+  T3: { fg: 'var(--color-t3)', bg: 'var(--color-t3-bg)' },
+  T4: { fg: 'var(--color-t4)', bg: 'var(--color-t4-bg)' },
+  T5: { fg: 'var(--color-t5)', bg: 'var(--color-t5-bg)' },
+};
+
+const tone = tier ? tones[tier] : { fg: 'var(--color-muted)', bg: 'var(--color-rule)' };
+const text = tier ? labels[tier] : 'unclassified';
+
+const padding = size === 'sm' ? '2px 8px' : '3px 10px';
+const fontSize = size === 'sm' ? '0.7rem' : '0.78rem';
+---
+
+<span
+  class="label-mono inline-block whitespace-nowrap rounded-sm font-semibold"
+  style={`color: ${tone.fg}; background: ${tone.bg}; padding: ${padding}; font-size: ${fontSize}; letter-spacing: 0.04em;`}
+>
+  {text}
+</span>

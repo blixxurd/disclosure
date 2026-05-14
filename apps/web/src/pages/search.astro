@@ -1,0 +1,109 @@
+---
+import Base from '../layouts/Base.astro';
+import TierBadge from '../components/TierBadge.astro';
+import { searchText, slugFromNaturalKey } from '../lib/records.js';
+
+const url = new URL(Astro.request.url);
+const q = url.searchParams.get('q')?.trim() ?? '';
+const hits = q ? searchText(q, 100) : [];
+
+// Group hits by record so we don't show the same record 5x for 5 file hits.
+type Grouped = { recordId: number; record: typeof hits[number]['record']; snippets: string[] };
+const byRecord = new Map<number, Grouped>();
+for (const h of hits) {
+  const g = byRecord.get(h.record.id) ?? {
+    recordId: h.record.id,
+    record: h.record,
+    snippets: [],
+  };
+  if (g.snippets.length < 3) g.snippets.push(h.snippet);
+  byRecord.set(h.record.id, g);
+}
+const grouped = [...byRecord.values()];
+
+// Decode our <<<...>>> markers into <mark> tags client-side. Server-side
+// substitution is done with set:html below — escape user text first.
+function renderSnippet(s: string): string {
+  const escaped = s
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+  return escaped
+    .replace(/&lt;&lt;&lt;/g, '<mark style="background: var(--color-t1-bg); color: var(--color-t1); padding: 0 2px; border-radius: 2px; font-weight: 600;">')
+    .replace(/&gt;&gt;&gt;/g, '</mark>');
+}
+---
+
+<Base title={q ? `Search: ${q} · Disclosure` : 'Search · Disclosure'}>
+  <div class="mb-8">
+    <h1 class="font-bold tracking-tight mb-4" style="font-size: 1.85rem; line-height: 1.15;">
+      Search the corpus
+    </h1>
+
+    <form method="get" action="/search" class="flex gap-2 max-w-xl">
+      <input
+        type="search"
+        name="q"
+        value={q}
+        autofocus
+        placeholder="extraterrestrial · intelligent control · Maury …"
+        class="flex-1 rounded border px-3 py-2 text-base"
+        style="border-color: var(--color-rule); background: var(--color-bg); color: var(--color-fg);"
+      />
+      <button
+        type="submit"
+        class="rounded px-4 py-2 font-semibold"
+        style="background: var(--color-fg); color: var(--color-bg);"
+      >
+        Search
+      </button>
+    </form>
+
+    <div class="label-mono mt-3" style="color: var(--color-muted);">
+      Full-text via SQLite FTS5 across {grouped.length === 0 && !q ? '4.9M' : '4.9M'} chars of extracted PDF / OCR text. Phrases: <code style="font-family: var(--font-mono);">"intelligent control"</code>. Boolean: <code style="font-family: var(--font-mono);">extraterrestrial AND vehicle</code>.
+    </div>
+  </div>
+
+  {q && (
+    <div class="mb-6">
+      <div class="label-mono" style="color: var(--color-muted);">
+        {grouped.length === 0
+          ? `No results for "${q}".`
+          : `${grouped.length} record${grouped.length === 1 ? '' : 's'} matching "${q}"`}
+      </div>
+    </div>
+  )}
+
+  {grouped.length > 0 && (
+    <div class="flex flex-col gap-4">
+      {grouped.map((g) => {
+        const slug = slugFromNaturalKey(g.record.natural_key);
+        const title = g.record.title?.replace(/\s+/g, ' ').trim() ?? 'Untitled record';
+        return (
+          <article class="rounded border p-4" style="border-color: var(--color-rule); background: var(--color-paper);">
+            <div class="flex items-baseline gap-2 mb-2 flex-wrap">
+              <TierBadge tier={g.record.classification?.tier ?? null} size="sm" />
+              {g.record.agency && (
+                <span class="label-mono" style="color: var(--color-faint);">
+                  · {g.record.agency}
+                </span>
+              )}
+            </div>
+            <h3 class="font-semibold leading-snug mb-2" style="font-size: 1.05rem;">
+              <a href={`/records/${slug}`} style="color: inherit;">{title}</a>
+            </h3>
+            <div class="flex flex-col gap-2">
+              {g.snippets.map((s) => (
+                <p
+                  class="prose"
+                  style="font-size: 0.95rem; color: var(--color-muted); line-height: 1.6; margin: 0;"
+                  set:html={renderSnippet(s)}
+                />
+              ))}
+            </div>
+          </article>
+        );
+      })}
+    </div>
+  )}
+</Base>

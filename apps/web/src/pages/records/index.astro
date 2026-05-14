@@ -1,0 +1,143 @@
+---
+import Base from '../../layouts/Base.astro';
+import RecordCard from '../../components/RecordCard.astro';
+import {
+  listRecords,
+  sortByTier,
+  filterRecords,
+  distinctFacets,
+} from '../../lib/records.js';
+
+const url = new URL(Astro.request.url);
+const filters = {
+  tier: url.searchParams.get('tier') ?? undefined,
+  theme: url.searchParams.get('theme') ?? undefined,
+  agency: url.searchParams.get('agency') ?? undefined,
+  type: url.searchParams.get('type') ?? undefined,
+};
+
+const all = listRecords();
+const filtered = sortByTier(filterRecords(all, filters));
+const facets = distinctFacets(all);
+
+function urlWithout(key: string): string {
+  const p = new URLSearchParams(url.search);
+  p.delete(key);
+  return p.toString() ? `/records?${p.toString()}` : '/records';
+}
+function urlWith(key: string, value: string): string {
+  const p = new URLSearchParams(url.search);
+  p.set(key, value);
+  return `/records?${p.toString()}`;
+}
+
+const hasActiveFilters = Object.values(filters).some((v) => v);
+
+// Compact filter chip helper — server-rendered, no JS.
+interface FilterPair { label: string; key: string; value: string }
+const active: FilterPair[] = [];
+if (filters.tier) active.push({ label: `tier ${filters.tier}`, key: 'tier', value: filters.tier });
+if (filters.theme) active.push({ label: filters.theme, key: 'theme', value: filters.theme });
+if (filters.agency) active.push({ label: filters.agency, key: 'agency', value: filters.agency });
+if (filters.type) active.push({ label: filters.type, key: 'type', value: filters.type });
+---
+
+<Base title="Records · Disclosure">
+  <div class="mb-6">
+    <h1 class="font-bold tracking-tight" style="font-size: 1.85rem; line-height: 1.15;">All records</h1>
+    <div class="label-mono mt-2" style="color: var(--color-muted);">
+      {filtered.length} of {all.length} records · sorted by tier
+    </div>
+  </div>
+
+  <details class="mb-6 rounded border" open={!hasActiveFilters ? false : true} style="border-color: var(--color-rule); background: var(--color-paper);">
+    <summary class="label-mono cursor-pointer p-3" style="color: var(--color-muted);">
+      Filters
+      {hasActiveFilters && (
+        <span style="color: var(--color-t1); margin-left: 6px;">· {active.length} active</span>
+      )}
+    </summary>
+
+    <div class="px-3 pb-3 flex flex-col gap-3">
+      {hasActiveFilters && (
+        <div class="flex flex-wrap gap-2 items-center pb-2 border-b" style="border-color: var(--color-rule);">
+          <span class="label-mono" style="color: var(--color-faint);">Active:</span>
+          {active.map((p) => (
+            <a href={urlWithout(p.key)} class="label-mono rounded px-2 py-0.5"
+               style="background: var(--color-t1-bg); color: var(--color-t1);">
+              {p.label} ✕
+            </a>
+          ))}
+          <a href="/records" class="label-mono ml-auto" style="color: var(--color-faint);">clear all</a>
+        </div>
+      )}
+
+      <div class="flex flex-col gap-3">
+        <div>
+          <div class="label-mono mb-1" style="color: var(--color-faint);">Tier</div>
+          <div class="flex flex-wrap gap-1">
+            {facets.tiers.map((t) => (
+              <a
+                href={urlWith('tier', t)}
+                class="label-mono rounded px-2 py-0.5"
+                style={filters.tier === t ? 'background: var(--color-fg); color: var(--color-bg);' : 'background: var(--color-rule); color: var(--color-fg);'}
+              >
+                {t}
+              </a>
+            ))}
+          </div>
+        </div>
+        <div>
+          <div class="label-mono mb-1" style="color: var(--color-faint);">Theme</div>
+          <div class="flex flex-wrap gap-1">
+            {facets.themes.map((t) => (
+              <a
+                href={urlWith('theme', t)}
+                class="label-mono rounded px-2 py-0.5"
+                style={filters.theme === t ? 'background: var(--color-fg); color: var(--color-bg);' : 'background: var(--color-rule); color: var(--color-fg);'}
+              >
+                {t}
+              </a>
+            ))}
+          </div>
+        </div>
+        <div>
+          <div class="label-mono mb-1" style="color: var(--color-faint);">Agency</div>
+          <div class="flex flex-wrap gap-1">
+            {facets.agencies.map((a) => (
+              <a
+                href={urlWith('agency', a)}
+                class="label-mono rounded px-2 py-0.5"
+                style={filters.agency === a ? 'background: var(--color-fg); color: var(--color-bg);' : 'background: var(--color-rule); color: var(--color-fg);'}
+              >
+                {a}
+              </a>
+            ))}
+          </div>
+        </div>
+        <div>
+          <div class="label-mono mb-1" style="color: var(--color-faint);">Type</div>
+          <div class="flex flex-wrap gap-1">
+            {facets.types.map((t) => (
+              <a
+                href={urlWith('type', t)}
+                class="label-mono rounded px-2 py-0.5"
+                style={filters.type === t ? 'background: var(--color-fg); color: var(--color-bg);' : 'background: var(--color-rule); color: var(--color-fg);'}
+              >
+                {t}
+              </a>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  </details>
+
+  <div class="card-grid">
+    {filtered.map((r) => <RecordCard record={r} />)}
+  </div>
+
+  {filtered.length === 0 && (
+    <p class="prose" style="color: var(--color-muted);">No records match the active filters.</p>
+  )}
+</Base>
