@@ -4,6 +4,11 @@ dist/
 *.tsbuildinfo
 coverage/
 
+# Astro
+**/.astro/
+**/.vercel/
+**/.netlify/
+
 # Editors / OS
 .DS_Store
 Thumbs.db
