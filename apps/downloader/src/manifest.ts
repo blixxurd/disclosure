@@ -3,10 +3,13 @@ import type { APIRequestContext } from 'playwright';
 import { sha256, urlSlug } from '@disclosure/shared/util';
 import { createLogger } from '@disclosure/shared/log';
 import type { ReleaseConfig } from '@disclosure/shared/db';
+import { inferReleaseFromDate } from './release-map.js';
 
 const log = createLogger('');
 
-// What the war.gov CSV gives us, before we normalize.
+// What the war.gov CSV gives us, before we normalize. As of Release 02,
+// two new columns appeared (`Image Alt Text`, `Image VIRIN`); they ride
+// through as raw_csv_json for now.
 interface RawRow {
   Redaction?: string;
   'Release Date'?: string;
@@ -22,13 +25,19 @@ interface RawRow {
   'Incident Location'?: string;
   'PDF | Image Link'?: string;
   'Modal Image'?: string;
+  'Image Alt Text'?: string;
+  'Image VIRIN'?: string;
 }
 
+export type PrimaryType = 'PDF' | 'IMG' | 'VID' | 'AUD';
+
 export interface ParsedRecord {
+  release_slug: string;
+  release_name: string;
   natural_key: string;
   title: string | null;
   agency: string | null;
-  primary_type: 'PDF' | 'IMG' | 'VID' | null;
+  primary_type: PrimaryType | null;
   description: string | null;
   incident_date: string | null;
   incident_loc: string | null;
@@ -72,11 +81,10 @@ export async function fetchManifest(
   };
 }
 
-// Parse and dedupe the CSV.
-export function parseManifest(
-  csvText: string,
-  release: ReleaseConfig,
-): ParsedRecord[] {
+// Parse and dedupe the CSV. Each row's release is inferred from its
+// `Release Date` value via release-map.ts; rows with unknown dates are
+// skipped (and logged inside inferReleaseFromDate).
+export function parseManifest(csvText: string): ParsedRecord[] {
   // Strip BOM if present (war.gov CSV starts with U+FEFF).
   const text = csvText.charCodeAt(0) === 0xfeff ? csvText.slice(1) : csvText;
 
@@ -97,6 +105,8 @@ export function parseManifest(
 
   for (const row of result.data) {
     if (!row || !row.Title) continue;
+    const release = inferReleaseFromDate(row['Release Date'] ?? null);
+    if (!release) continue;
     const parsed = rowToRecord(row, release);
     if (!parsed) continue;
     if (seenKeys.has(parsed.natural_key)) {
@@ -131,11 +141,11 @@ function rowToRecord(row: RawRow, release: ReleaseConfig): ParsedRecord | null {
 
   const files: ParsedFile[] = [];
 
-  // For VID rows, `PDF | Image Link` is a cross-reference pointing at a *paired*
-  // PDF record's file — not a file belonging to the video record itself.
-  // (The cross-ref is captured separately in pdf_pairing.) For PDF/IMG rows,
-  // the link is the record's main file.
-  if (mainUrl && primary_type !== 'VID') {
+  // For VID/AUD rows, `PDF | Image Link` is a cross-reference pointing at a
+  // *paired* PDF record's file — not a file belonging to this record itself.
+  // The cross-ref is captured separately in pdf_pairing. For PDF/IMG rows,
+  // the link IS this record's main file.
+  if (mainUrl && primary_type !== 'VID' && primary_type !== 'AUD') {
     const kind: ParsedFile['kind'] = primary_type === 'IMG' ? 'image' : 'pdf';
     files.push({ kind, source_system: 'war.gov', source_url: mainUrl });
   }
@@ -143,8 +153,12 @@ function rowToRecord(row: RawRow, release: ReleaseConfig): ParsedRecord | null {
     files.push({ kind: 'thumbnail', source_system: 'war.gov', source_url: thumbnailUrl });
   }
   if (dvids_video_id) {
-    // Placeholder file row — schema-ready for the future DVIDS resolver.
-    // source_url is the DVIDS web page URL until we add API-driven mp4 resolution.
+    // Both VID and AUD records live on DVIDS. The kind stays 'video' for both
+    // because the file-table contract is "which transport does this come
+    // from"; the audio/video distinction is on the parent record's
+    // primary_type. (Splitting into a separate 'audio' kind would force a
+    // schema change for zero behavior benefit — DVIDS resolves both the same
+    // way.)
     files.push({
       kind: 'video',
       source_system: 'dvids',
@@ -167,7 +181,9 @@ function rowToRecord(row: RawRow, release: ReleaseConfig): ParsedRecord | null {
   const raw_csv_json = JSON.stringify(row);
 
   // content_sha256: salient fields only. If gov edits a description or adds a
-  // file, this changes → we re-process the record.
+  // file, this changes → we re-process the record. Image Alt Text + Image
+  // VIRIN are intentionally excluded for now (cosmetic metadata; adding them
+  // to existing R01 rows would spuriously bump every record's hash).
   const salient = {
     title,
     agency,
@@ -186,6 +202,8 @@ function rowToRecord(row: RawRow, release: ReleaseConfig): ParsedRecord | null {
   const content_sha256 = sha256(JSON.stringify(salient));
 
   return {
+    release_slug: release.slug,
+    release_name: release.name,
     natural_key,
     title,
     agency,
@@ -211,10 +229,10 @@ function trimOrNull(s: string | undefined): string | null {
   return t.length === 0 ? null : t;
 }
 
-function normalizeType(raw: string | null): 'PDF' | 'IMG' | 'VID' | null {
+function normalizeType(raw: string | null): PrimaryType | null {
   if (!raw) return null;
   const up = raw.trim().toUpperCase();
-  if (up === 'PDF' || up === 'IMG' || up === 'VID') return up;
+  if (up === 'PDF' || up === 'IMG' || up === 'VID' || up === 'AUD') return up;
   // Future-proof: unknown types passed through as null + logged.
   log.warn('unknown record Type', { raw });
   return null;
@@ -223,13 +241,13 @@ function normalizeType(raw: string | null): 'PDF' | 'IMG' | 'VID' | null {
 function deriveNaturalKey(args: {
   release: ReleaseConfig;
   title: string;
-  primary_type: 'PDF' | 'IMG' | 'VID' | null;
+  primary_type: PrimaryType | null;
   mainUrl: string | null;
   dvids_video_id: string | null;
 }): string | null {
-  // VID rows: identify by DVIDS id. The mainUrl on these rows is a
+  // VID/AUD rows: identify by DVIDS id. The mainUrl on these rows is a
   // cross-reference to a paired PDF record, not this record's own file.
-  if (args.primary_type === 'VID' && args.dvids_video_id) {
+  if ((args.primary_type === 'VID' || args.primary_type === 'AUD') && args.dvids_video_id) {
     return `${args.release.slug}::dvids:${args.dvids_video_id}`;
   }
   if (args.mainUrl) {

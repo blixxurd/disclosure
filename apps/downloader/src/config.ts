@@ -1,14 +1,6 @@
 // Downloader-specific configuration. Path constants live in @disclosure/shared/config.
-import type { ReleaseConfig } from '@disclosure/shared/db';
-
-export const RELEASES: ReleaseConfig[] = [
-  {
-    slug: 'release_1',
-    name: 'Release 01',
-    sourceUrl: 'https://www.war.gov/UFO/',
-    manifestUrl: 'https://www.war.gov/Portals/1/Interactive/2026/UFO/uap-csv.csv',
-  },
-];
+// Release metadata + manifest URL live in ./release-map.ts (single source of
+// truth for the merged uap-data.csv and per-release-date mapping).
 
 export const DOWNLOAD_CONCURRENCY = 4;
 export const DOWNLOAD_TIMEOUT_MS = 5 * 60_000;

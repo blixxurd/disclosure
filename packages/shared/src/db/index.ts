@@ -124,12 +124,12 @@ export interface FileUpsertInput {
 }
 
 export interface ManifestSnapshotInput {
-  release_id: number;
   fetched_at: string;
   content_sha256: string;
   byte_size: number;
   row_count: number;
   raw_path: string;
+  releases_seen: string[];
 }
 
 export interface RunCounts {
@@ -227,12 +227,13 @@ export class Db {
   }
 
   // ── manifest snapshots ──────────────────────────────────────────────────
-  findLatestManifestSnapshot(releaseId: number): { content_sha256: string } | null {
+  // Snapshots are no longer release-scoped (gov ships one merged CSV).
+  findLatestManifestSnapshot(): { content_sha256: string } | null {
     const row = this.db
-      .prepare<[number], { content_sha256: string }>(
-        'SELECT content_sha256 FROM manifest_snapshot WHERE release_id = ? ORDER BY id DESC LIMIT 1',
+      .prepare<[], { content_sha256: string }>(
+        'SELECT content_sha256 FROM manifest_snapshot ORDER BY id DESC LIMIT 1',
       )
-      .get(releaseId);
+      .get();
     return row ?? null;
   }
 
@@ -240,17 +241,17 @@ export class Db {
     this.db
       .prepare(
         `INSERT INTO manifest_snapshot
-           (release_id, fetched_at, content_sha256, byte_size, row_count, raw_path)
+           (fetched_at, content_sha256, byte_size, row_count, raw_path, releases_seen)
          VALUES (?, ?, ?, ?, ?, ?)
-         ON CONFLICT(release_id, content_sha256) DO NOTHING`,
+         ON CONFLICT(content_sha256) DO NOTHING`,
       )
       .run(
-        input.release_id,
         input.fetched_at,
         input.content_sha256,
         input.byte_size,
         input.row_count,
         input.raw_path,
+        JSON.stringify(input.releases_seen),
       );
   }
 
