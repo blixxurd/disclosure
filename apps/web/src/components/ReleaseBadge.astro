@@ -1,0 +1,25 @@
+---
+import { releaseLabelFromSlug, releaseSlugFromNaturalKey } from '../lib/records.js';
+
+interface Props {
+  naturalKey: string;
+  size?: 'sm' | 'md';
+}
+
+const { naturalKey, size = 'sm' } = Astro.props;
+const slug = releaseSlugFromNaturalKey(naturalKey);
+const label = releaseLabelFromSlug(slug);
+if (!label) return null;
+
+const padding = size === 'sm' ? '2px 7px' : '3px 9px';
+const fontSize = size === 'sm' ? '0.65rem' : '0.72rem';
+---
+
+<a
+  href={`/records?release=${slug}`}
+  class="label-mono inline-block whitespace-nowrap rounded-sm"
+  style={`color: var(--color-muted); background: var(--color-rule); padding: ${padding}; font-size: ${fontSize}; letter-spacing: 0.06em; text-decoration: none;`}
+  title={`Filter to ${label}`}
+>
+  {label}
+</a>

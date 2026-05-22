@@ -1,0 +1,129 @@
+---
+import Base from '../layouts/Base.astro';
+import { getChangesReport, type EditKind, type RetroactiveEdit } from '../lib/changes.js';
+
+const report = getChangesReport();
+
+const KIND_LABEL: Record<EditKind, string> = {
+  title: 'Title renames',
+  description: 'Description edits',
+  pdf_pairing: 'PDF Pairing re-curation',
+  video_pairing: 'Video Pairing re-curation',
+  file_replaced: 'File replacements',
+  tombstoned: 'Records removed',
+};
+
+const KIND_BLURB: Record<EditKind, string> = {
+  title:
+    'The gov retroactively renamed these Release 01 records — almost all of them to apply Release-02-style zero-padded IDs (e.g. "DOW-UAP-D3" → "DOW-UAP-D003").',
+  description:
+    'Substantive edits to a record\'s description blurb. Worth a look — these include factual corrections (a 1952 memo date was changed from 7/18 to 7/28 between releases).',
+  pdf_pairing:
+    'Cross-reference re-curation. The gov added or removed paired-PDF references on Release 01 records when Release 02 went out.',
+  video_pairing: 'Cross-reference re-curation for paired video records.',
+  file_replaced:
+    'The underlying file was replaced with a different file under a new filename. Both old and new are preserved on disk for audit.',
+  tombstoned:
+    'These Release 01 records vanished from the manifest between snapshots without an obvious replacement.',
+};
+
+const grouped = new Map<EditKind, RetroactiveEdit[]>();
+for (const e of report.edits) {
+  if (!grouped.has(e.kind)) grouped.set(e.kind, []);
+  grouped.get(e.kind)!.push(e);
+}
+const orderedKinds: EditKind[] = [
+  'title',
+  'description',
+  'pdf_pairing',
+  'video_pairing',
+  'file_replaced',
+  'tombstoned',
+];
+
+function fmt(ts: string): string {
+  if (!ts) return '—';
+  return ts.replace('T', ' ').replace(/\.\d+Z$/, ' UTC');
+}
+---
+
+<Base title="Retroactive edits · Disclosure">
+  <header class="mb-8 pb-6 border-b" style="border-color: var(--color-rule);">
+    <h1 class="font-bold tracking-tight" style="font-size: 1.85rem; line-height: 1.15;">
+      What the gov silently edited between releases
+    </h1>
+    <p class="prose mt-3" style="color: var(--color-muted); max-width: 60ch;">
+      The Department of War's PURSUE site is not append-only. When a new release
+      drops, the gov also revises prior releases' records — renaming files,
+      correcting dates, re-curating cross-references. Most readers will never
+      see these edits because war.gov serves only the current state. We compare
+      the frozen Release&nbsp;01 manifest snapshot from {fmt(report.baseline_at)}
+      against the current merged manifest from {fmt(report.current_at)} and
+      list every change below.
+    </p>
+  </header>
+
+  <section class="mb-10">
+    <div class="grid gap-3" style="grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));">
+      <div class="rounded border p-3" style="border-color: var(--color-rule); background: var(--color-paper);">
+        <div class="label-mono" style="color: var(--color-faint);">Total edits</div>
+        <div class="font-bold mt-1" style="font-size: 1.5rem;">{report.total}</div>
+      </div>
+      {orderedKinds.map((k) => {
+        const n = report.by_kind[k] ?? 0;
+        if (n === 0) return null;
+        return (
+          <div class="rounded border p-3" style="border-color: var(--color-rule); background: var(--color-paper);">
+            <div class="label-mono" style="color: var(--color-faint);">{KIND_LABEL[k]}</div>
+            <div class="font-bold mt-1" style="font-size: 1.5rem;">{n}</div>
+          </div>
+        );
+      })}
+    </div>
+  </section>
+
+  {report.total === 0 && (
+    <p class="prose" style="color: var(--color-muted);">
+      No retroactive edits detected. (This page becomes interesting once a
+      second release ships.)
+    </p>
+  )}
+
+  {orderedKinds.map((k) => {
+    const list = grouped.get(k);
+    if (!list || list.length === 0) return null;
+    return (
+      <section class="mb-12">
+        <h2 class="font-bold mb-2" style="font-size: 1.15rem; letter-spacing: 0.01em;">
+          {KIND_LABEL[k]} <span class="label-mono" style="color: var(--color-faint); margin-left: 8px;">{list.length}</span>
+        </h2>
+        <p class="prose mb-4" style="color: var(--color-muted); max-width: 60ch;">
+          {KIND_BLURB[k]}
+        </p>
+        <div class="flex flex-col gap-3">
+          {list.map((e) => (
+            <article class="rounded border p-3" style="border-color: var(--color-rule); background: var(--color-paper);">
+              <a href={`/records/${e.url_slug}`} class="label-mono" style="color: var(--color-muted); text-decoration: none;">
+                {e.natural_key}
+              </a>
+              <div class="mt-2 grid gap-1" style="grid-template-columns: 1fr;">
+                <div>
+                  <span class="label-mono" style="color: var(--color-faint);">was:</span>
+                  <span class="ml-2" style="color: var(--color-muted); text-decoration: line-through;">
+                    {e.old ?? <em>(empty)</em>}
+                  </span>
+                </div>
+                <div>
+                  <span class="label-mono" style="color: var(--color-faint);">now:</span>
+                  <span class="ml-2" style="color: var(--color-fg);">
+                    {e.new ?? <em>(removed)</em>}
+                  </span>
+                </div>
+              </div>
+            </article>
+          ))}
+        </div>
+      </section>
+    );
+  })}
+</Base>

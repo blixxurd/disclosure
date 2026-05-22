@@ -1,7 +1,8 @@
 ---
 import type { RecordSummary } from '../lib/types.js';
-import { slugFromNaturalKey } from '../lib/records.js';
+import { slugFromNaturalKey, friendlyTitle } from '../lib/records.js';
 import TierBadge from './TierBadge.astro';
+import ReleaseBadge from './ReleaseBadge.astro';
 import ThemeChip from './ThemeChip.astro';
 
 interface Props {
@@ -11,9 +12,14 @@ const { record } = Astro.props;
 const slug = slugFromNaturalKey(record.natural_key);
 const href = `/records/${slug}`;
 
-// Trim very long titles for the card; full title shows on detail page.
-const title = (record.title ?? 'Untitled record').replace(/\s+/g, ' ').trim();
-const truncatedTitle = title.length > 110 ? title.slice(0, 107) + '…' : title;
+// Friendly display title goes in the heading; gov's literal title shows
+// underneath as a small citation key. Both truncated for card density.
+const rawTitle = (record.title ?? 'Untitled record').replace(/\s+/g, ' ').trim();
+const display = friendlyTitle(rawTitle) ?? rawTitle;
+const truncate = (s: string, n: number) => (s.length > n ? s.slice(0, n - 1) + '…' : s);
+const truncatedDisplay = truncate(display, 110);
+const truncatedRaw = truncate(rawTitle, 90);
+const showRaw = rawTitle !== display;
 
 // Top 3 themes, prioritized.
 const themes = (record.classification?.themes ?? []).slice(0, 3);
@@ -23,16 +29,25 @@ const themes = (record.classification?.themes ?? []).slice(0, 3);
   <a href={href} style="color: inherit;">
     <div class="flex items-start justify-between gap-2 mb-2">
       <TierBadge tier={record.classification?.tier ?? null} size="sm" />
-      {record.primary_type && (
-        <span class="label-mono" style="color: var(--color-faint);">
-          {record.primary_type}
-        </span>
-      )}
+      <div class="flex items-center gap-2">
+        <ReleaseBadge naturalKey={record.natural_key} size="sm" />
+        {record.primary_type && (
+          <span class="label-mono" style="color: var(--color-faint);">
+            {record.primary_type}
+          </span>
+        )}
+      </div>
     </div>
 
-    <h3 class="font-semibold leading-snug mb-2" style="font-size: 1rem;">
-      {truncatedTitle}
+    <h3 class="font-semibold leading-snug" style="font-size: 1rem;">
+      {truncatedDisplay}
     </h3>
+    {showRaw && (
+      <div class="label-mono mb-2" style="color: var(--color-faint); font-size: 0.7rem; word-break: break-all;">
+        {truncatedRaw}
+      </div>
+    )}
+    {!showRaw && <div class="mb-2"></div>}
 
     <div class="label-mono mb-3" style="color: var(--color-muted);">
       {record.agency ?? 'Unknown agency'}

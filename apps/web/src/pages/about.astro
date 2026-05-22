@@ -1,10 +1,14 @@
 ---
 import Base from '../layouts/Base.astro';
-import { listRecords } from '../lib/records.js';
+import { listRecords, releaseSlugFromNaturalKey } from '../lib/records.js';
 
 const records = listRecords();
+const r01Count = records.filter((r) => releaseSlugFromNaturalKey(r.natural_key) === 'release_1').length;
+const r02Count = records.filter((r) => releaseSlugFromNaturalKey(r.natural_key) === 'release_02').length;
 const stats = {
   records: records.length,
+  r01: r01Count,
+  r02: r02Count,
   pdfs: records.filter((r) => r.pdf_path).length,
   videos: records.filter((r) => r.video_path).length,
   t1: records.filter((r) => r.classification?.tier === 'T1').length,
@@ -23,10 +27,19 @@ const stats = {
 
     <p>
       On May 8, 2026, the Department of War posted Release 01 at <a href="https://www.war.gov/UFO/" rel="noreferrer">war.gov/UFO</a> —
-      158 records spread across PDFs, images, and DVIDS videos. The originals are encrypted with
+      158 records spread across PDFs, images, and DVIDS videos. On May 22, 2026,
+      Release 02 added another 63 records (with the new AUD type for NASA Apollo/Gemini/Mercury
+      crew audio debriefings). Total: <strong>{stats.records}</strong> records
+      ({stats.r01} from R01, {stats.r02} from R02). The originals are encrypted with
       copy-restrictions, hosted behind an Akamai bot-block, and scattered across a Vue
       single-page app. This site is a complete local mirror, decrypted, OCR'd, classified,
       and rendered as something you can actually read.
+    </p>
+
+    <p>
+      The gov edits prior releases on each new tranche (titles renamed, dates corrected,
+      cross-references re-curated). See <a href="/changes">/changes</a> for the full diff of
+      what was silently rewritten between Release&nbsp;01 and Release&nbsp;02.
     </p>
 
     <h2 class="font-bold mt-8 mb-2" style="font-size: 1.25rem;">What's been done</h2>
@@ -49,19 +62,29 @@ const stats = {
       <li><strong>T5 · Context</strong> ({stats.t5} records) — tangential material swept into the disclosure.</li>
     </ul>
 
+    <h2 class="font-bold mt-8 mb-2" style="font-size: 1.25rem;">Source-data quality findings</h2>
+    <ul>
+      <li><strong>Release 01</strong> shipped with <strong>three byte-identical duplicate rows</strong> in the CSV (DOW-UAP-D32 Mission Report, Syria, October 2024 — repeated thrice). Our dedupe caught it.</li>
+      <li><strong>Release 02</strong> shipped with <strong>one duplicate DVIDS reference</strong> (video ID 1007720 appears in two rows). Same dedupe gate caught it. As of release-day, this duplicate is still live in <code>uap-data.csv</code>.</li>
+      <li>Three Release 01 Mission Report PDFs (D63 Strait of Hormuz, D64 Iran, D65 Persian Gulf — all Oct/Nov 2020) were malformed enough that poppler couldn't parse them. <code>ghostscript</code> rewrites them cleanly; OCR yields ~8-12 KB of text per file.</li>
+      <li>Release 02 added two new CSV columns (<code>Image Alt Text</code>, <code>Image VIRIN</code>) without any announcement; they're stored as raw metadata.</li>
+      <li>Between releases, the gov retroactively renamed 132 R01 records (zero-padded IDs) and edited 2 description blurbs. See <a href="/changes">/changes</a>.</li>
+    </ul>
+
     <h2 class="font-bold mt-8 mb-2" style="font-size: 1.25rem;">Methodology and caveats</h2>
     <ul>
       <li>OCR'd text from scanned material carries noise — verify against the source PDF (linked from each record) before quoting externally.</li>
       <li>Tier assignments are first-pass and not editorial judgments. Some records straddle multiple tiers; the highest applicable one wins.</li>
-      <li>Filename-derived natural keys are stable per record; URLs are deterministic, suitable for citation.</li>
-      <li>Original gov data quality issues (year typos, duplicate rows, malformed PDFs) are documented as findings rather than silently fixed.</li>
+      <li>Filename-derived natural keys are stable per record across renames; DVIDS-id keys are stable too. URLs are deterministic, suitable for citation.</li>
+      <li>Classifier currently has no text-content rules for AUD or VID records — all 8 audio and 77 video records sit at T5 by default. Audio especially is high-signal content (Apollo crew sighting debriefings) that deserves transcription + classification in a future pass.</li>
     </ul>
 
     <h2 class="font-bold mt-8 mb-2" style="font-size: 1.25rem;">Source</h2>
     <p>
       Code at <a href="https://github.com/blixxurd/disclosure" rel="noreferrer">github.com/blixxurd/disclosure</a> (private).
       The whole pipeline (download → index → classify → web) is reproducible with
-      <code>pnpm refresh &amp;&amp; pnpm web</code>. When the gov posts Release 02, the corpus rebuilds incrementally.
+      <code>pnpm refresh &amp;&amp; pnpm web</code>. Each new release rebuilds the corpus incrementally —
+      Release 02 ingest took under two minutes end-to-end.
     </p>
 
     <p class="label-mono mt-12" style="color: var(--color-faint);">

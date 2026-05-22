@@ -11,12 +11,13 @@ function isActive(p: string): boolean {
     <div class="flex items-center justify-between gap-4">
       <a href="/" class="flex items-baseline gap-3" style="color: inherit;">
         <span class="font-bold tracking-tight" style="font-size: 1.15rem;">DISCLOSURE</span>
-        <span class="label-mono">// MIRROR-01 // 2026-05-08</span>
+        <span class="label-mono">// MIRROR · R01 + R02</span>
       </a>
 
       <nav class="flex items-center gap-4 label-mono" aria-label="Primary">
         <a href="/records" class:list={[isActive('/records') && 'underline']}>Records</a>
         <a href="/search" class:list={[isActive('/search') && 'underline']}>Search</a>
+        <a href="/changes" class:list={[isActive('/changes') && 'underline']}>Changes</a>
         <a href="/about" class:list={[isActive('/about') && 'underline']}>About</a>
       </nav>
     </div>

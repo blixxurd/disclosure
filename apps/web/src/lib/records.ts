@@ -115,28 +115,33 @@ export function recordsAtTier(tier: Tier): RecordSummary[] {
   return listRecords().filter((r) => r.classification?.tier === tier);
 }
 
-/** Distinct values for filter UI (agencies, types, themes). */
+/** Distinct values for filter UI (agencies, types, themes, releases). */
 export function distinctFacets(records: RecordSummary[]): {
   agencies: string[];
   types: string[];
   themes: Theme[];
   tiers: Tier[];
+  releases: string[];
 } {
   const agencies = new Set<string>();
   const types = new Set<string>();
   const themes = new Set<Theme>();
   const tiers = new Set<Tier>();
+  const releases = new Set<string>();
   for (const r of records) {
     if (r.agency) agencies.add(r.agency);
     if (r.primary_type) types.add(r.primary_type);
     if (r.classification?.tier) tiers.add(r.classification.tier);
     for (const t of r.classification?.themes ?? []) themes.add(t);
+    const rel = releaseSlugFromNaturalKey(r.natural_key);
+    if (rel) releases.add(rel);
   }
   return {
     agencies: [...agencies].sort(),
     types: [...types].sort(),
     themes: [...themes].sort() as Theme[],
     tiers: [...tiers].sort((a, b) => TIER_RANK[b] - TIER_RANK[a]),
+    releases: [...releases].sort(),
   };
 }
 
@@ -149,6 +154,116 @@ export function slugFromNaturalKey(naturalKey: string): string {
   const idx = naturalKey.indexOf('::');
   const tail = idx >= 0 ? naturalKey.slice(idx + 2) : naturalKey;
   return tail.replace(/[^a-zA-Z0-9_-]/g, '-');
+}
+
+/**
+ * Release prefix from natural_key. Returns the prefix verbatim
+ * ('release_1', 'release_02', etc.) so callers can decide how to render it.
+ */
+export function releaseSlugFromNaturalKey(naturalKey: string): string | null {
+  const idx = naturalKey.indexOf('::');
+  return idx > 0 ? naturalKey.slice(0, idx) : null;
+}
+
+/**
+ * Map a release slug to a short label ('release_1' → 'R01', 'release_02' → 'R02').
+ * Falls back to the slug verbatim for anything unrecognized.
+ */
+export function releaseLabelFromSlug(slug: string | null): string | null {
+  if (!slug) return null;
+  const m = slug.match(/^release_0*(\d+)$/);
+  if (!m) return slug;
+  return 'R' + m[1]!.padStart(2, '0');
+}
+
+// Words that stay lowercase inside a title (unless they're the first word).
+const TITLE_SMALL_WORDS = new Set([
+  'a', 'an', 'and', 'as', 'at', 'but', 'by', 'for', 'in', 'nor', 'of',
+  'on', 'or', 'the', 'to', 'via', 'vs',
+]);
+
+function titleCase(text: string): string {
+  const tokens = text.split(/(\s+)/); // keep separators
+  let firstWordIdx = -1;
+  return tokens
+    .map((t, i) => {
+      if (/^\s+$/.test(t) || t === '') return t;
+      if (firstWordIdx === -1) firstWordIdx = i;
+      const lower = t.toLowerCase();
+      if (i !== firstWordIdx && TITLE_SMALL_WORDS.has(lower)) return lower;
+      // Preserve all-caps and CamelCase words; only fix lowercase-only tokens.
+      if (t === lower && /^[a-z]+$/.test(t)) return t.charAt(0).toUpperCase() + t.slice(1);
+      return t;
+    })
+    .join('');
+}
+
+/**
+ * Derive a human-readable display name from the gov's CSV Title field.
+ *
+ * The gov ships two title shapes: (a) friendly with an "AGENCY-UAP-XXX, ..."
+ * record-ID prefix; (b) raw archival IDs like
+ * "65_HS1-834228961_62-HQ-83894_Section_001" or "18_100754_ General 1946-7_Vol_2".
+ * This function unwraps (a) and translates (b) into something a reader can
+ * scan. The original title is still displayed underneath as the citation key
+ * — never destroyed.
+ */
+export function friendlyTitle(title: string | null): string | null {
+  if (!title) return null;
+  const raw = title.trim();
+  if (!raw) return null;
+
+  // (1) FBI archival pattern: 65_HS1-{seqno}_{case-num}[_Section|_Serial|_SUB[_N]]
+  const fbi = /^65_HS1-\d+_([0-9A-Z][\w.-]*?)(?:_(Section|Serial|SUB)_?(.+))?$/.exec(raw);
+  if (fbi) {
+    const caseNum = fbi[1]!;
+    const kind = fbi[2];
+    const idx = fbi[3];
+    if (!kind) return `FBI Case ${caseNum}`;
+    const cleanIdx = idx ? idx.replace(/^0+(\d)/, '$1') : '';
+    const kindTitle = kind === 'SUB' ? 'Sub' : kind; // Section, Serial, Sub
+    return cleanIdx ? `FBI Case ${caseNum}, ${kindTitle} ${cleanIdx}` : `FBI Case ${caseNum}`;
+  }
+
+  // (2) War Dept archival "NN_NNN_(HS1-NN_)?descriptive text".
+  // Recognize titles that *begin* with two underscore-separated number groups
+  // (and optionally an HS1- archive ID). Strip them and clean up.
+  const wd =
+    /^\d+_\d+(?:_HS1-\d+)?[_ ]+(.+)$/.exec(raw) ??
+    /^\d+_HS1-\d+[_ ]+(.+)$/.exec(raw);
+  if (wd) {
+    let rest = wd[1]!.trim();
+    // Drop a leading gov file-classification number like "319.1 " that
+    // sometimes survives the prefix strip (e.g. 342_HS1-…_319.1 Flying Discs).
+    rest = rest.replace(/^\d+\.\d+[\s_]+/, '');
+    // Insert a space between letter run and digit run inside tokens like
+    // "box7" → "box 7". Done before titleCase so the new "box" gets capped.
+    rest = rest.replace(/([A-Za-z])(\d)/g, '$1 $2');
+    // Underscores → spaces; collapse runs of whitespace.
+    rest = rest.replace(/_/g, ' ').replace(/\s+/g, ' ').trim();
+    // Re-bracket a trailing year-in-brackets if present (rare).
+    rest = rest.replace(/\[([\d.]+)\]$/, '($1)');
+    return titleCase(rest);
+  }
+
+  // (3) AGENCY-UAP-XXX prefix strip. Matches:
+  //   DOW-UAP-D003,        ODNI-UAP-D001,    NASA-UAP-D008,
+  //   DOW-UAP-PR050,       CIA-UAP-D001,     DOE-UAP-D001,
+  //   NASA-UAP-D003A,
+  const agency = /^[A-Z]+(?:-[A-Z]+)*-UAP-[A-Z]{0,3}\d+[A-Za-z]?,\s*(.+)$/.exec(raw);
+  if (agency) {
+    let rest = agency[1]!.trim();
+    // Unwrap balanced surrounding quotes.
+    rest = rest.replace(/^"(.*)"$/, '$1').replace(/^'(.*)'$/, '$1');
+    // Common gov typo we won't silently fix in the underlying data, but
+    // we can fix it for display.
+    rest = rest.replace(/\bCorrespondance\b/g, 'Correspondence');
+    return rest;
+  }
+
+  // (4) Default: hand back as-is. Don't over-aggressively transform titles
+  // that already read fine (e.g., "FBI Photo A001", "COMETA Report").
+  return raw;
 }
 
 interface RecordDetailRow extends RecordSummaryRow {
@@ -341,6 +456,7 @@ export interface RecordFilters {
   theme?: string;
   agency?: string;
   type?: string;
+  release?: string;
 }
 
 export function filterRecords(
@@ -353,6 +469,7 @@ export function filterRecords(
       return false;
     if (filters.agency && r.agency !== filters.agency) return false;
     if (filters.type && r.primary_type !== filters.type) return false;
+    if (filters.release && releaseSlugFromNaturalKey(r.natural_key) !== filters.release) return false;
     return true;
   });
 }

@@ -1,11 +1,12 @@
 ---
 import Base from '../../layouts/Base.astro';
 import TierBadge from '../../components/TierBadge.astro';
+import ReleaseBadge from '../../components/ReleaseBadge.astro';
 import ThemeChip from '../../components/ThemeChip.astro';
 import MetadataTable from '../../components/MetadataTable.astro';
 import Findings from '../../components/Findings.astro';
 import FileEmbed from '../../components/FileEmbed.astro';
-import { getRecordBySlug } from '../../lib/records.js';
+import { getRecordBySlug, friendlyTitle } from '../../lib/records.js';
 
 const { slug } = Astro.params;
 if (!slug) return Astro.redirect('/records');
@@ -16,13 +17,15 @@ if (!record) {
 }
 
 const cls = record.classification;
-const title = record.title ?? 'Untitled record';
+const rawTitle = record.title ?? 'Untitled record';
+const displayTitle = friendlyTitle(rawTitle) ?? rawTitle;
+const showRawTitle = rawTitle !== displayTitle;
 const TEXT_PREVIEW_LIMIT = 4000;
 const previewText = record.text?.text.slice(0, TEXT_PREVIEW_LIMIT);
 const hasMoreText = (record.text?.text.length ?? 0) > TEXT_PREVIEW_LIMIT;
 ---
 
-<Base title={`${title} · Disclosure`}>
+<Base title={`${displayTitle} · Disclosure`}>
   <div class="mb-8">
     <a href="/records" class="label-mono">← All records</a>
   </div>
@@ -30,6 +33,7 @@ const hasMoreText = (record.text?.text.length ?? 0) > TEXT_PREVIEW_LIMIT;
   <header class="mb-10 pb-6 border-b" style="border-color: var(--color-rule);">
     <div class="flex flex-wrap items-center gap-2 mb-3">
       <TierBadge tier={cls?.tier ?? null} size="sm" />
+      <ReleaseBadge naturalKey={record.natural_key} size="sm" />
       {record.primary_type && (
         <span class="label-mono" style="color: var(--color-faint);">
           {record.primary_type}
@@ -43,11 +47,17 @@ const hasMoreText = (record.text?.text.length ?? 0) > TEXT_PREVIEW_LIMIT;
     </div>
 
     <h1
-      class="font-bold tracking-tight mb-3"
+      class="font-bold tracking-tight"
       style="font-size: clamp(1.6rem, 4vw, 2.2rem); line-height: 1.2; letter-spacing: -0.01em; word-break: break-word;"
     >
-      {title}
+      {displayTitle}
     </h1>
+    {showRawTitle && (
+      <div class="label-mono mt-1 mb-3" style="color: var(--color-faint); word-break: break-all;">
+        gov ID · {rawTitle}
+      </div>
+    )}
+    {!showRawTitle && <div class="mb-3"></div>}
 
     <div class="label-mono flex flex-wrap gap-x-4 gap-y-1" style="color: var(--color-muted);">
       {record.incident_date && record.incident_date !== 'N/A' && (

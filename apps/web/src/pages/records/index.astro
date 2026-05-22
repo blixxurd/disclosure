@@ -6,6 +6,7 @@ import {
   sortByTier,
   filterRecords,
   distinctFacets,
+  releaseLabelFromSlug,
 } from '../../lib/records.js';
 
 const url = new URL(Astro.request.url);
@@ -14,6 +15,7 @@ const filters = {
   theme: url.searchParams.get('theme') ?? undefined,
   agency: url.searchParams.get('agency') ?? undefined,
   type: url.searchParams.get('type') ?? undefined,
+  release: url.searchParams.get('release') ?? undefined,
 };
 
 const all = listRecords();
@@ -40,6 +42,12 @@ if (filters.tier) active.push({ label: `tier ${filters.tier}`, key: 'tier', valu
 if (filters.theme) active.push({ label: filters.theme, key: 'theme', value: filters.theme });
 if (filters.agency) active.push({ label: filters.agency, key: 'agency', value: filters.agency });
 if (filters.type) active.push({ label: filters.type, key: 'type', value: filters.type });
+if (filters.release)
+  active.push({
+    label: releaseLabelFromSlug(filters.release) ?? filters.release,
+    key: 'release',
+    value: filters.release,
+  });
 ---
 
 <Base title="Records · Disclosure">
@@ -73,6 +81,22 @@ if (filters.type) active.push({ label: filters.type, key: 'type', value: filters
       )}
 
       <div class="flex flex-col gap-3">
+        {facets.releases.length > 1 && (
+          <div>
+            <div class="label-mono mb-1" style="color: var(--color-faint);">Release</div>
+            <div class="flex flex-wrap gap-1">
+              {facets.releases.map((r) => (
+                <a
+                  href={urlWith('release', r)}
+                  class="label-mono rounded px-2 py-0.5"
+                  style={filters.release === r ? 'background: var(--color-fg); color: var(--color-bg);' : 'background: var(--color-rule); color: var(--color-fg);'}
+                >
+                  {releaseLabelFromSlug(r) ?? r}
+                </a>
+              ))}
+            </div>
+          </div>
+        )}
         <div>
           <div class="label-mono mb-1" style="color: var(--color-faint);">Tier</div>
           <div class="flex flex-wrap gap-1">
